@@ -5,6 +5,26 @@ authors = ["Kristoffer Carlsson <kcarlsson89@gmail.com>"]
 
 [deps]
 HDF5 = "f67ccb44-e63f-5c2f-98bd-6dc0ccc4ba2f"
+VTKBase = "4004b06d-e244-455f-a6ce-a5f9919cc534"
 
 [compat]
-HDF5 = "0.17.3"
+Aqua = "0.8"
+ExplicitImports = "1"
+HDF5 = "0.17"
+JET = "0.10, 0.11"
+JSON = "0.21, 1"
+ParallelTestRunner = "2"
+Test = "1"
+VTKBase = "1"
+julia = "1.10"
+
+[extras]
+Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
+ExplicitImports = "7d51a73a-1435-4ff3-83d9-f097790105c7"
+JET = "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b"
+JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
+ParallelTestRunner = "d3525ed8-44d0-4b2c-a655-542cee43accc"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Aqua", "ExplicitImports", "JET", "JSON", "ParallelTestRunner", "Test"]

@@ -1,0 +1,6 @@
+Manifest.toml
+.claude/
+Ferrite.jl/
+docs/build/
+docs/Manifest.toml
+PLAN.md

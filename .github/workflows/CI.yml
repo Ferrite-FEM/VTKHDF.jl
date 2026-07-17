@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+    tags: ['*']
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+
+jobs:
+  test:
+    name: Julia ${{ matrix.version }} - ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    permissions:
+      actions: write
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ['1.10', '1', 'pre', 'nightly']
+        os: [ubuntu-latest]
+        include:
+          - version: '1'
+            os: macos-latest
+          - version: '1'
+            os: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: ${{ matrix.version }}
+      - uses: julia-actions/cache@v2
+      # Python VTK provides vtkHDFReader for the round-trip validation tests
+      # (they are skipped when unavailable); h5dump backs the raw-layout tests.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install VTK (round-trip validation)
+        run: pip install vtk
+        continue-on-error: true
+      - name: Install h5dump
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y hdf5-tools
+        continue-on-error: true
+      - uses: julia-actions/julia-buildpkg@v1
+      - uses: julia-actions/julia-runtest@v1
+
+  docs:
+    name: Documentation
+    permissions:
+      contents: write
+      statuses: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1'
+      - uses: julia-actions/cache@v2
+      - name: Instantiate docs environment
+        run: julia --project=docs -e 'using Pkg; Pkg.instantiate()'
+      - run: julia --project=docs docs/make.jl
+        env:
+          CI: 'true'
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}

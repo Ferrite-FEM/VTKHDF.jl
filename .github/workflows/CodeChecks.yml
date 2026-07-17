@@ -1,0 +1,82 @@
+name: Code checks
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+jobs:
+  pre-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
+        env:
+          # Runic has its own job below; run the remaining pre-commit hooks here.
+          SKIP: runic,runic-md
+
+  runic:
+    name: Runic
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1'
+      - uses: julia-actions/cache@v2
+      - uses: fredrikekre/runic-action@v1
+        with:
+          version: '1.7'
+          docstrings: true
+          extensions: 'jl,md'
+
+  jet:
+    name: JET.jl
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1'
+      - uses: julia-actions/cache@v2
+      - name: JET tests
+        shell: julia --color=yes --project=@jet {0}
+        run: |
+          using Pkg
+          Pkg.add(PackageSpec(name = "JET", version = "0.11"))
+          Pkg.develop(path = pwd())
+          include(joinpath(pwd(), "test", "jet.jl"))
+
+  aqua:
+    name: Aqua.jl
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1'
+      - uses: julia-actions/cache@v2
+      - name: Aqua tests
+        shell: julia --color=yes --project=@aqua {0}
+        run: |
+          using Pkg
+          Pkg.add(PackageSpec(name = "Aqua", version = "0.8"))
+          Pkg.develop(path = pwd())
+          include(joinpath(pwd(), "test", "aqua.jl"))
+
+  explicit-imports:
+    name: ExplicitImports.jl
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1'
+      - uses: julia-actions/cache@v2
+      - name: ExplicitImports tests
+        shell: julia --color=yes --project=@explicit-imports {0}
+        run: |
+          using Pkg
+          Pkg.add(PackageSpec(name = "ExplicitImports", version = "1"))
+          Pkg.develop(path = pwd())
+          include(joinpath(pwd(), "test", "explicit_imports.jl"))
