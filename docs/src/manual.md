@@ -1,10 +1,11 @@
 # [Manual](@id manual)
 
 All files are created through a small family of constructors. Every
-constructor supports the do-block form (closing the file automatically), a
-`temporal = true` keyword for time-dependent writing, `compress = true|0-9`
-for gzip compression, and appends the `.vtkhdf` extension when the filename
-has none.
+constructor supports the do-block form (closing the file automatically) and
+`compress = true|0-9` for gzip compression, and appends the `.vtkhdf`
+extension when the filename has none. The grid, table and composite
+constructors also take `temporal = true` for time-dependent writing
+(OverlappingAMR and HyperTreeGrid are static-only).
 
 ## Data arrays
 
@@ -14,7 +15,7 @@ Data is attached with index syntax:
 vtk["name"] = data                       # location inferred from the size
 vtk["name", VTKPointData()] = data       # explicit location
 vtk["name", VTKCellData()] = data
-vtk["name", VTKFieldData()] = [1.0, 2.0] # global arrays (also strings)
+vtk["name", VTKFieldData()] = [1.0, 2.0] # global arrays (strings: static files only)
 vtk["v", VTKPointData(), attribute = :Vectors] = v   # mark active attribute
 ```
 
@@ -28,8 +29,7 @@ Accepted array shapes follow WriteVTK.jl's component-first convention:
   dimensions can be dropped).
 
 If a size matches both the points and the cells, the location must be given
-explicitly. Names must be ASCII without `/` or `.` (a VTKHDF format
-restriction).
+explicitly. Names must not contain `/` or `.` (a VTKHDF format restriction).
 
 ## Unstructured grids
 
@@ -103,8 +103,8 @@ vtkhdf_grid("struct", xyz)
 
 ## Time series
 
-Opening any constructor with `temporal = true` enables
-[`write_timestep`](@ref):
+Opening a grid, table or composite-block constructor with `temporal = true`
+enables [`write_timestep`](@ref):
 
 ```julia
 vtk = vtkhdf_grid("simulation", points, cells; temporal = true)

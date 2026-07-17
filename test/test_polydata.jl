@@ -55,7 +55,7 @@
 
     @testset "temporal" begin
         fn = joinpath(dir, "pd_t.vtkhdf")
-        vtk = vtkhdf_grid(fn, pts, polys; temporal = true)
+        vtk = vtkhdf_grid(fn, pts, polys, lines; temporal = true)
         for s in 1:3
             write_timestep(vtk, Float64(s)) do frame
                 frame["w"] = fill(Float64(s), 4)

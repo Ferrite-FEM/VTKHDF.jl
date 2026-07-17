@@ -80,20 +80,23 @@ function add_partition(
     kind = vtk.kind
     npoints, pts = prepare_points(points)
     cats = poly_categorize(cellvecs)
+    topos = map(cat -> PartitionTopology(cat, npoints), cats)
+    ncells_part = sum(n_cells, topos)
+    preflight_partition_data(pointdata, npoints, "point")
+    preflight_partition_data(celldata, ncells_part, "cell")
     root = vtk.root
+    check_points_eltype(root, eltype(pts))
     append_rows(appendable(vtk, root, "Points", eltype(pts), (3,)), pts)
     append_rows(appendable(vtk, root, "NumberOfPoints", Int64, ()), Int64(npoints))
-    ncells_part = 0
     newcells = Int[]
     newconn = Int[]
     for (i, catname) in enumerate(POLY_CATEGORIES)
         grp = get_or_create_group(root, catname)
-        topo = PartitionTopology(cats[i])
+        topo = topos[i]
         append_rows(appendable(vtk, grp, "Connectivity", Int64, ()), topo.connectivity)
         append_rows(appendable(vtk, grp, "Offsets", Int64, ()), topo.offsets)
         append_rows(appendable(vtk, grp, "NumberOfCells", Int64, ()), Int64(n_cells(topo)))
         append_rows(appendable(vtk, grp, "NumberOfConnectivityIds", Int64, ()), Int64(length(topo.connectivity)))
-        ncells_part += n_cells(topo)
         push!(newcells, n_cells(topo))
         push!(newconn, length(topo.connectivity))
     end
@@ -123,6 +126,15 @@ function geometry_ref(kind::PolyDataState, snap::NTuple{10, Int})
         ncells = sum(kind.total_cells) - sum(cells_off),
         conn_offsets = conn_off,
     )
+end
+
+# A polydata file closed without any partition still needs the full (empty)
+# layout: write one zero-sized partition.
+function finalize_kind!(vtk, kind::PolyDataState)
+    if kind.total_parts == 0
+        add_partition(vtk, zeros(Float64, 3, 0))
+    end
+    return nothing
 end
 
 # ---- data ----

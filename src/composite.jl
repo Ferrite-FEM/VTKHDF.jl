@@ -12,6 +12,13 @@ mutable struct VTKHDFCollection
     blocks::Vector{VTKHDFFile}
     next_index::Int
     isopen::Bool
+    node_paths::Set{String}  # assembly nodes created via add_node
+end
+
+# Handle for a block created with add_empty_block (no dataset type).
+struct VTKHDFEmptyBlock
+    col::VTKHDFCollection
+    root::HDF5.Group
 end
 
 struct AssemblyNode
@@ -43,7 +50,7 @@ function vtkhdf_collection(filename::AbstractString; multiblock::Bool = false)
     write_version_attribute(root, (2, 1))
     # always present, even when empty: vtkHDFReader crashes without it
     HDF5.create_group(root, "Assembly"; track_order = true)
-    return VTKHDFCollection(file, root, multiblock, VTKHDFFile[], 0, true)
+    return VTKHDFCollection(file, root, multiblock, VTKHDFFile[], 0, true, Set{String}())
 end
 
 """
@@ -85,17 +92,23 @@ function register_block(dest::BlockDest, vtk::VTKHDFFile)
 end
 
 """
-    add_empty_block(col, name)
+    add_empty_block(col, name) -> block
 
 Add a block with no dataset type to a composite file (a placeholder allowed by
-the spec).
+the spec). The returned handle can be referenced from the Assembly with
+[`add_block_ref`](@ref).
 """
 function add_empty_block(col::VTKHDFCollection, name::AbstractString)
     col.isopen || error("collection is closed")
     check_name(name, "block name")
     haskey(col.root, name) && throw(ArgumentError("block $name already exists"))
-    HDF5.create_group(col.root, name; track_order = true)
-    return col
+    grp = HDF5.create_group(col.root, name; track_order = true)
+    if !col.multiblock
+        # every top-level PDC block needs a globally unique Index
+        HDF5.attrs(grp)["Index"] = Int64(col.next_index)
+        col.next_index += 1
+    end
+    return VTKHDFEmptyBlock(col, grp)
 end
 
 """
@@ -104,13 +117,23 @@ end
 Create a group node in the Assembly hierarchy of a composite file (under the
 root assembly, or nested under another node).
 """
-function add_node(col::VTKHDFCollection, name::AbstractString)
+add_node(col::VTKHDFCollection, name::AbstractString) =
+    AssemblyNode(col, assembly_node_group(col, assembly_group(col), name))
+add_node(node::AssemblyNode, name::AbstractString) =
+    AssemblyNode(node.col, assembly_node_group(node.col, node.group, name))
+
+function assembly_node_group(col::VTKHDFCollection, parent::HDF5.Group, name::AbstractString)
     check_name(name, "assembly node name")
-    return AssemblyNode(col, get_or_create_group(assembly_group(col), name; track_order = true))
-end
-function add_node(node::AssemblyNode, name::AbstractString)
-    check_name(name, "assembly node name")
-    return AssemblyNode(node.col, get_or_create_group(node.group, name; track_order = true))
+    path = HDF5.name(parent) * "/" * name
+    if haskey(parent, name)
+        # get-or-create only for groups this collection created via add_node;
+        # anything else (e.g. a block soft link) is a name collision
+        path in col.node_paths ||
+            throw(ArgumentError("assembly name $name collides with an existing link"))
+        return parent[name]::HDF5.Group
+    end
+    push!(col.node_paths, path)
+    return HDF5.create_group(parent, name; track_order = true)
 end
 
 """
@@ -119,15 +142,29 @@ end
 Reference a block from the Assembly hierarchy (a soft link named after the
 block). A block may be referenced from several nodes.
 """
-function add_block_ref(node::AssemblyNode, blk::VTKHDFFile)
+function add_block_ref(node::AssemblyNode, blk::Union{VTKHDFFile, VTKHDFEmptyBlock})
+    check_block_ref(node.col, blk)
     target = HDF5.name(blk.root)
     create_soft_link(node.group, basename(target), target)
     return node
 end
-function add_block_ref(col::VTKHDFCollection, blk::VTKHDFFile)
+function add_block_ref(col::VTKHDFCollection, blk::Union{VTKHDFFile, VTKHDFEmptyBlock})
+    check_block_ref(col, blk)
     target = HDF5.name(blk.root)
     create_soft_link(assembly_group(col), basename(target), target)
     return col
+end
+
+function check_block_ref(col::VTKHDFCollection, blk::VTKHDFFile)
+    col.isopen || error("collection is closed")
+    blk.isopen || error("block is closed")
+    blk in col.blocks || throw(ArgumentError("the block does not belong to this collection"))
+    return nothing
+end
+function check_block_ref(col::VTKHDFCollection, blk::VTKHDFEmptyBlock)
+    col.isopen || error("collection is closed")
+    blk.col === col || throw(ArgumentError("the block does not belong to this collection"))
+    return nothing
 end
 
 function Base.close(col::VTKHDFCollection)

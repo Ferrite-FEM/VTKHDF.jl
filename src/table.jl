@@ -56,7 +56,12 @@ function consistent_rows(rows::Dict{String, Int}, start::Dict{String, Int}, grou
 end
 
 function finalize_kind!(vtk, kind::TableState)
-    vtk.temporal && return nothing
+    get_or_create_group(vtk.root, "RowData")
+    if vtk.temporal
+        # zero-step file: materialize an empty NumberOfRows
+        vtk.nsteps == 0 && appendable(vtk, vtk.root, "NumberOfRows", Int64, ())
+        return nothing
+    end
     nrows = consistent_rows(vtk.data_rows, Dict{String, Int}(), "RowData")
     HDF5.write_dataset(vtk.root, "NumberOfRows", Int64[nrows])
     return nothing

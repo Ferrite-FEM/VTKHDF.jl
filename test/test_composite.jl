@@ -15,7 +15,8 @@
             b1["w"] = rand(4)
             img = vtkhdf_grid(col, "Img", VTKImageData(), (2, 2, 2))
             img["s"] = rand(2, 2, 2)
-            add_empty_block(col, "Empty")
+            empty = add_empty_block(col, "Empty")
+            add_block_ref(col, empty)
             solids = add_node(col, "solids")
             add_block_ref(solids, b0)
             inner = add_node(solids, "inner")
@@ -30,6 +31,8 @@
             @test attrs(g["Img"])["Index"] == 2
             @test attrs(g["Mesh"])["Type"] == "UnstructuredGrid"
             @test !haskey(attrs(g["Empty"]), "Type")
+            @test attrs(g["Empty"])["Index"] == 3  # PDC blocks all carry an Index
+            @test haskey(g, "Assembly/Empty")
             @test haskey(g, "Assembly/solids/Mesh")
             @test haskey(g, "Assembly/solids/inner/Surf")
         end

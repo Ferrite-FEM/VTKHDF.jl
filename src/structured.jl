@@ -26,11 +26,10 @@ function init_structured(
         dest, dims::NTuple{3, Int}, xyz::AbstractArray{<:Real, 4};
         whole_extent = nothing, temporal = false, compress = false, chunk_size = 0
     )
+    ext = check_whole_extent(whole_extent, dims)
     file, root = open_dest(dest)
     write_ascii_attribute(root, "Type", "StructuredGrid")
     write_version_attribute(root, (2, 7))
-    ext = whole_extent === nothing ?
-        (0, dims[1] - 1, 0, dims[2] - 1, 0, dims[3] - 1) : Tuple(whole_extent)
     HDF5.attrs(root)["WholeExtent"] = Int64[ext...]
     vtk = make_vtkfile(
         file, root, StructuredState(dims, 0, nothing);

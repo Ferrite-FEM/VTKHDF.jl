@@ -39,6 +39,7 @@ close(vtk)
 """
 function write_timestep(f::Function, vtk::VTKHDFFile, t::Real; kwargs...)
     vtk.isopen || error("file is closed")
+    vtk.failed && error("a previous write to this file failed; the file is incomplete")
     vtk.temporal || error("write_timestep requires a file opened with temporal = true")
     vtk.in_step && error("nested write_timestep")
     vtk.in_step = true
@@ -50,10 +51,18 @@ function write_timestep(f::Function, vtk::VTKHDFFile, t::Real; kwargs...)
         f(vtk)
         ok = true
     finally
-        if ok
-            end_step!(vtk, t)
+        # A failure anywhere leaves already-appended data unreferenced by any
+        # step; mark the file as failed instead of trying to roll back HDF5
+        # extents (the data written by completed steps remains valid).
+        try
+            ok && end_step!(vtk, t)
+        catch
+            ok = false
+            rethrow()
+        finally
+            vtk.in_step = false
+            ok || (vtk.failed = true)
         end
-        vtk.in_step = false
     end
     return vtk
 end
@@ -67,12 +76,12 @@ function end_step!(vtk::VTKHDFFile, t::Real)
     kind = vtk.kind
     geom = finish_step_geometry!(vtk, kind)
     # Fixed array schema across steps, checked before recording the step.
-    keys_now = sort!(collect(keys(vtk.data_rows)))
+    keys_now = Set(keys(vtk.data_rows))
     if vtk.schema === nothing
         vtk.schema = keys_now
     elseif keys_now != vtk.schema
-        extra = setdiff(keys_now, vtk.schema)
-        missing_ = setdiff(vtk.schema, keys_now)
+        extra = sort!(collect(setdiff(keys_now, vtk.schema)))
+        missing_ = sort!(collect(setdiff(vtk.schema, keys_now)))
         error(
             "temporal array schema mismatch: new arrays $extra, missing arrays $missing_; " *
                 "the array schema is fixed by the first time step"
@@ -100,7 +109,7 @@ uses_data_offsets(kind::DatasetKind) = false
 function append_data_offsets!(vtk::VTKHDFFile, sg)
     schema = vtk.schema
     schema === nothing && return nothing
-    for key in schema
+    for key in sort!(collect(schema))
         groupname, name = split(key, '/'; limit = 2)
         start = get(vtk.step_start_rows, key, 0)
         nthis = vtk.data_rows[key] - start

@@ -95,37 +95,37 @@ function vtkhdf_grid(dest::Dest, coords::Vararg{AbstractVector{<:Real}, N}; kwar
         dims3 = ntuple(i -> i <= N ? length(coords[i]) : 1, 3)
         origin = ntuple(i -> i <= N ? Float64(first(coords[i])) : 0.0, 3)
         spacing = ntuple(i -> i <= N && length(coords[i]) > 1 ? Float64(step(coords[i])) : 1.0, 3)
-        return init_image(dest, dims3; origin, spacing, kwargs...)
+        return register_and_init(dest, init_image, dims3; origin, spacing, kwargs...)
     end
     x = coords[1]
     y = N >= 2 ? coords[2] : [0.0]
     z = N >= 3 ? coords[3] : [0.0]
-    return init_rectilinear(dest, x, y, z; kwargs...)
+    return register_and_init(dest, init_rectilinear, x, y, z; kwargs...)
 end
 
 vtkhdf_grid(::VTKImageData, dest::Dest, dims::Tuple{Vararg{Integer}}; kwargs...) =
-    init_image(dest, ntuple(i -> i <= length(dims) ? Int(dims[i]) : 1, 3); kwargs...)
+    register_and_init(dest, init_image, ntuple(i -> i <= length(dims) ? Int(dims[i]) : 1, 3); kwargs...)
 vtkhdf_grid(
     ::VTKRectilinearGrid, dest::Dest, x::AbstractVector{<:Real},
     y::AbstractVector{<:Real} = [0.0], z::AbstractVector{<:Real} = [0.0]; kwargs...
 ) =
-    init_rectilinear(dest, x, y, z; kwargs...)
+    register_and_init(dest, init_rectilinear, x, y, z; kwargs...)
 
 # -- StructuredGrid --
 function vtkhdf_grid(dest::Dest, xyz::AbstractArray{T, 4}; kwargs...) where {T <: Real}
     dims, pts = structured_points(xyz)
-    return init_structured(dest, dims, pts; kwargs...)
+    return register_and_init(dest, init_structured, dims, pts; kwargs...)
 end
 function vtkhdf_grid(
         dest::Dest, x::AbstractArray{T, 3}, y::AbstractArray{T, 3},
         z::AbstractArray{T, 3}; kwargs...
     ) where {T <: Real}
     dims, pts = structured_points(x, y, z)
-    return init_structured(dest, dims, pts; kwargs...)
+    return register_and_init(dest, init_structured, dims, pts; kwargs...)
 end
 function vtkhdf_grid(::VTKStructuredGrid, dest::Dest, xyz::AbstractArray{T, 4}; kwargs...) where {T <: Real}
     dims, pts = structured_points(xyz)
-    return init_structured(dest, dims, pts; kwargs...)
+    return register_and_init(dest, init_structured, dims, pts; kwargs...)
 end
 
 register_and_init(dest, init, args...; kwargs...) =

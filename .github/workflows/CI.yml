@@ -41,13 +41,15 @@ jobs:
           python-version: '3.12'
       - name: Install VTK (round-trip validation)
         run: pip install vtk
-        continue-on-error: true
+        continue-on-error: ${{ runner.os != 'Linux' }}
       - name: Install h5dump
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y hdf5-tools
-        continue-on-error: true
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
+        env:
+          # the VTK round-trip validation must actually run on Linux
+          WRITEVTKHDF_REQUIRE_VTK: ${{ runner.os == 'Linux' && 'true' || 'false' }}
 
   docs:
     name: Documentation

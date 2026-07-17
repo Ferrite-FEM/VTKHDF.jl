@@ -4,7 +4,7 @@ const CHUNK_TARGET_BYTES = 1 << 20  # ~1 MiB chunks
 
 function check_name(name::AbstractString, what::String = "array name")
     isempty(name) && throw(ArgumentError("$what must not be empty"))
-    isascii(name) || throw(ArgumentError("$what must be ASCII, got $(repr(name))"))
+    isvalid(name) || throw(ArgumentError("$what must be valid UTF-8, got $(repr(name))"))
     if occursin('/', name) || occursin('.', name)
         throw(ArgumentError("VTKHDF does not allow '/' or '.' in names, got $(repr(name))"))
     end

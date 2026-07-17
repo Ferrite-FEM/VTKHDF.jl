@@ -75,8 +75,12 @@ function add_partition(
     check_partition_allowed(vtk)
     kind = vtk.kind
     npoints, pts = prepare_points(points)
-    topo = PartitionTopology(cells)
+    topo = PartitionTopology(cells, npoints)
+    # preflight everything before the first HDF5 mutation
+    preflight_partition_data(pointdata, npoints, "point")
+    preflight_partition_data(celldata, n_cells(topo), "cell")
     root = vtk.root
+    check_points_eltype(root, eltype(pts))
     append_rows(appendable(vtk, root, "Points", eltype(pts), (3,)), pts)
     append_rows(appendable(vtk, root, "Connectivity", Int64, ()), topo.connectivity)
     append_rows(appendable(vtk, root, "Offsets", Int64, ()), topo.offsets)
@@ -108,8 +112,26 @@ function add_partition(
     return vtk
 end
 
+function preflight_partition_data(pairs, expected::Int, what::String)
+    for (name, data) in pairs
+        check_name(String(name))
+        n = tuple_count(data)
+        n == expected || error("partition $what data $name has $n tuples, expected $expected")
+    end
+    return nothing
+end
+
+function check_points_eltype(root, ::Type{T}) where {T}
+    if haskey(root, "Points")
+        E = eltype(get_dataset(root, "Points"))
+        E == T || error("points change element type ($E -> $T); convert the coordinates explicitly")
+    end
+    return nothing
+end
+
 function check_partition_allowed(vtk::VTKHDFFile)
     vtk.isopen || error("file is closed")
+    vtk.failed && error("a previous write to this file failed; the file is incomplete")
     if vtk.temporal && !vtk.in_step && vtk.nsteps > 0
         error("temporal file: partitions must be added inside write_timestep")
     end
@@ -118,9 +140,16 @@ end
 
 function write_partition_data(vtk, pairs, loc, expected::Int)
     for (name, data) in pairs
-        n = tuple_count(data)
-        n == expected || error("partition data $name has $n tuples, expected $expected")
         set_data!(vtk, data, String(name), loc; attribute = nothing)
+    end
+    return nothing
+end
+
+# An unstructured file closed without any partition still needs the full
+# (empty) layout: write one zero-sized partition.
+function finalize_kind!(vtk, kind::UnstructuredState)
+    if kind.total_parts == 0
+        add_partition(vtk, zeros(Float64, 3, 0), Union{MeshCell{VTKCellType}, VTKPolyhedron}[])
     end
     return nothing
 end

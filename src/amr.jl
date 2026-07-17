@@ -82,25 +82,32 @@ function add_box(
     )
     vtk = lvl.vtk::VTKHDFFile{AMRState}
     vtk.isopen || error("file is closed")
-    (imin, imax, jmin, jmax, kmin, kmax) = extents
+    (imin, imax, jmin, jmax, kmin, kmax) = Int64.(extents)
     (imax >= imin && jmax >= jmin && kmax >= kmin) ||
         throw(ArgumentError("invalid AMR box extents $extents"))
-    ncells = (imax - imin + 1) * (jmax - jmin + 1) * (kmax - kmin + 1)
-    npoints = (imax - imin + 2) * (jmax - jmin + 2) * (kmax - kmin + 2)
+    ncells = Base.checked_mul(imax - imin + 1, jmax - jmin + 1, kmax - kmin + 1)
+    npoints = Base.checked_mul(imax - imin + 2, jmax - jmin + 2, kmax - kmin + 2)
+    # preflight all data before mutating the file
+    for (name, data) in pointdata
+        check_name(String(name))
+        n = tuple_count(data)
+        n == npoints || error("box point data $name has $n tuples, expected $npoints")
+    end
+    for (name, data) in celldata
+        check_name(String(name))
+        n = tuple_count(data)
+        n == ncells || error("box cell data $name has $n tuples, expected $ncells")
+    end
     append_rows(
         appendable(vtk, lvl.group, "AMRBox", Int64, (6,)),
-        reshape(Int64[extents...], 6, 1)
+        reshape(Int64[imin, imax, jmin, jmax, kmin, kmax], 6, 1)
     )
     lvl.total_points += npoints
     lvl.total_cells += ncells
     for (name, data) in pointdata
-        n = tuple_count(data)
-        n == npoints || error("box point data $name has $n tuples, expected $npoints")
         level_append_data!(lvl, "PointData", String(name), data)
     end
     for (name, data) in celldata
-        n = tuple_count(data)
-        n == ncells || error("box cell data $name has $n tuples, expected $ncells")
         level_append_data!(lvl, "CellData", String(name), data)
     end
     for (name, data) in fielddata

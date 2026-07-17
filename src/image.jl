@@ -8,6 +8,23 @@
 
 abstract type StructuredKind <: DatasetKind end
 
+# Validate (or derive) the point-extent attribute against the grid dimensions.
+function check_whole_extent(whole_extent, dims)
+    whole_extent === nothing &&
+        return (0, dims[1] - 1, 0, dims[2] - 1, 0, dims[3] - 1)
+    ext = Tuple(whole_extent)
+    length(ext) == 6 || throw(ArgumentError("whole_extent must have 6 entries"))
+    for i in 1:3
+        span = Int64(ext[2i]) - Int64(ext[2i - 1]) + 1
+        span == dims[i] || throw(
+            ArgumentError(
+                "whole_extent $ext does not match the grid dimensions $dims in direction $i"
+            )
+        )
+    end
+    return ext
+end
+
 point_dims(kind::StructuredKind) = kind.pdims
 cell_dims(kind::StructuredKind) = max.(point_dims(kind) .- 1, 1)
 
@@ -26,12 +43,10 @@ function init_image(
     length(origin) == 3 || throw(ArgumentError("origin must have 3 entries"))
     length(spacing) == 3 || throw(ArgumentError("spacing must have 3 entries"))
     length(direction) == 9 || throw(ArgumentError("direction must have 9 entries (row-major 3×3)"))
+    ext = check_whole_extent(whole_extent, dims)
     file, root = open_dest(dest)
     write_ascii_attribute(root, "Type", "ImageData")
     write_version_attribute(root, (2, 0))
-    ext = whole_extent === nothing ?
-        (0, dims[1] - 1, 0, dims[2] - 1, 0, dims[3] - 1) : Tuple(whole_extent)
-    length(ext) == 6 || throw(ArgumentError("whole_extent must have 6 entries"))
     HDF5.attrs(root)["WholeExtent"] = Int64[ext...]
     HDF5.attrs(root)["Origin"] = Float64[origin...]
     HDF5.attrs(root)["Spacing"] = Float64[spacing...]
@@ -101,6 +116,7 @@ function write_array!(
             vtk.schema !== nothing && !(key in vtk.schema) &&
                 error("array $key was not part of the first time step; the array schema is fixed by the first step")
             ds = get_dataset(grp, name)
+            eltype(ds) == T || error("array $key changes element type ($(eltype(ds)) -> $T)")
         else
             vtk.schema !== nothing &&
                 error("array $key was not part of the first time step; the array schema is fixed by the first step")

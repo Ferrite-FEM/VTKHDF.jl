@@ -5,7 +5,8 @@
 # Returns (ncomp, ntuples, array). `array` is either a Vector (ncomp == 1,
 # written as a 1-D dataset) or a (ncomp, ntuples) matrix.
 prepare_tuples(A::AbstractVector{<:Real}) = (1, length(A), A)
-prepare_tuples(A::AbstractMatrix{<:Real}) = (size(A, 1), size(A, 2), A)
+prepare_tuples(A::AbstractMatrix{<:Real}) =
+    size(A, 1) == 1 ? (1, size(A, 2), vec(A)) : (size(A, 1), size(A, 2), A)
 
 # Vectors of isbits "tuple-like" element types (SVector, Tensors.Vec, NTuple, ...)
 # with homogeneous field types are reinterpreted to a component matrix.

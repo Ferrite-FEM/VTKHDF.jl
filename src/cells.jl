@@ -21,7 +21,7 @@ struct PartitionTopology
     polyhedron_offsets::Vector{Int64}    # ncells + 1, starting at 0
 end
 
-function PartitionTopology(cells::AbstractVector{<:AnyCell})
+function PartitionTopology(cells::AbstractVector{<:AnyCell}, npoints::Integer = typemax(Int))
     nconn = sum(c -> length(c.connectivity), cells; init = 0)
     connectivity = Vector{Int64}(undef, nconn)
     offsets = Vector{Int64}(undef, length(cells) + 1)
@@ -36,6 +36,7 @@ function PartitionTopology(cells::AbstractVector{<:AnyCell})
     pos = 0
     for (i, cell) in enumerate(cells)
         for id in cell.connectivity
+            1 <= id <= npoints || throw(ArgumentError("cell $i references point $id, valid range is 1:$npoints"))
             pos += 1
             connectivity[pos] = id - 1
         end
@@ -46,6 +47,7 @@ function PartitionTopology(cells::AbstractVector{<:AnyCell})
             n_polyhedra += 1
             for face in VTKBase.faces(cell)
                 for id in face
+                    1 <= id <= npoints || throw(ArgumentError("polyhedron $i face references point $id, valid range is 1:$npoints"))
                     push!(face_connectivity, id - 1)
                 end
                 push!(face_offsets, length(face_connectivity))

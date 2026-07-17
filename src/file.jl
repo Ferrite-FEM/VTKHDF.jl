@@ -16,8 +16,9 @@ mutable struct VTKHDFFile{K <: DatasetKind}
     data_rows::Dict{String, Int}        # "PointData/u" => total rows written
     step_start_rows::Dict{String, Int}  # snapshot of data_rows at step begin
     field_ncomp::Dict{String, Int}      # ncomp of FieldData arrays (for FieldDataSizes)
-    schema::Union{Nothing, Vector{String}}  # frozen array set after first step
+    schema::Union{Nothing, Set{String}}  # frozen array set after first step
     step_values::Vector{Float64}       # time values written so far
+    failed::Bool                       # a write failed; the file is incomplete
 end
 
 function make_vtkfile(
@@ -29,7 +30,7 @@ function make_vtkfile(
     return VTKHDFFile(
         file, root, kind, temporal, level, Int(chunk_size), version,
         true, false, 0,
-        Dict{String, Int}(), Dict{String, Int}(), Dict{String, Int}(), nothing, Float64[]
+        Dict{String, Int}(), Dict{String, Int}(), Dict{String, Int}(), nothing, Float64[], false
     )
 end
 
@@ -55,12 +56,20 @@ end
 function Base.close(vtk::VTKHDFFile)
     vtk.isopen || return nothing
     vtk.in_step && error("close called inside write_timestep")
-    if vtk.temporal
-        vtk.nsteps == 0 && @warn "closing temporal VTKHDF file without any time steps"
+    if vtk.failed
+        @warn "closing a VTKHDF file after a failed write; the file is incomplete"
+    elseif vtk.temporal
+        if vtk.nsteps == 0
+            @warn "closing temporal VTKHDF file without any time steps"
+            # materialize an empty but complete Steps layout
+            sg = steps_group(vtk)
+            appendable(vtk, sg, "Values", Float64, ())
+        end
+        finalize_kind!(vtk, vtk.kind)
     else
         validate_static_data(vtk)
+        finalize_kind!(vtk, vtk.kind)
     end
-    finalize_kind!(vtk, vtk.kind)
     write_version_attribute(vtk.root, vtk.version)
     vtk.isopen = false
     close(vtk.root)
@@ -97,6 +106,7 @@ end
 
 function set_data!(vtk::VTKHDFFile, data, name::AbstractString, loc; attribute)
     vtk.isopen || error("file is closed")
+    vtk.failed && error("a previous write to this file failed; the file is incomplete")
     check_name(name)
     if vtk.temporal && !vtk.in_step
         error("temporal file: data must be written inside write_timestep")
@@ -139,6 +149,8 @@ function append_tuple_data!(vtk::VTKHDFFile, groupname::String, name::AbstractSt
         if vtk.schema !== nothing && !(key in vtk.schema)
             error("array $key was not part of the first time step; the array schema is fixed by the first step")
         end
+        eltype(ds) == eltype(arr) ||
+            error("array $key changes element type ($(eltype(ds)) -> $(eltype(arr)))")
     else
         if vtk.schema !== nothing
             error("array $key was not part of the first time step; the array schema is fixed by the first step")

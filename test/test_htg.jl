@@ -7,7 +7,9 @@
     vtkhdf_htg(fn; dimensions = (3, 3, 1), branch_factor = 2) do htg
         add_piece(
             htg;
-            descriptors = [true, false, false, false, false],
+            # one bit per cell of every non-deepest level: only tree 0 has a
+            # non-deepest level (its root), which is refined
+            descriptors = [true],
             depth_per_tree = [2, 1, 1, 1],
             tree_ids = [0, 1, 2, 3],
             number_of_cells_per_tree_depth = [1, 4, 1, 1, 1],
@@ -24,7 +26,7 @@
         @test attrs(g)["BranchFactor"] == 2
         @test attrs(g)["Dimensions"] == [3, 3, 1]
         @test read(g["Descriptors"]) == UInt8[0x80]  # MSB-first bit packing
-        @test read(g["DescriptorsSize"]) == [5]
+        @test read(g["DescriptorsSize"]) == [1]
         @test read(g["NumberOfCells"]) == [8]
         @test read(g["NumberOfDepths"]) == [5]
         @test read(g["NumberOfTrees"]) == [4]
@@ -43,7 +45,7 @@
     vtkhdf_htg(fn2; dimensions = (2, 2, 1), branch_factor = 2) do htg
         add_piece(
             htg;
-            descriptors = [false],
+            descriptors = Bool[],  # a depth-1 tree has no descriptor bits
             depth_per_tree = [1],
             tree_ids = [0],
             number_of_cells_per_tree_depth = [1],
@@ -60,4 +62,27 @@
     htg = vtkhdf_htg(joinpath(dir, "htg_bad.vtkhdf"); dimensions = (2, 2, 1))
     @test_throws ArgumentError htg["p", VTKPointData()] = rand(3)
     close(htg)
+    h5open(joinpath(dir, "htg_bad.vtkhdf")) do f
+        # closing without pieces materializes the (empty) layout
+        @test length(f["VTKHDF/NumberOfCells"]) == 0
+        @test length(f["VTKHDF/XCoordinates"]) == 0
+    end
+
+    # piece validation
+    htg2 = vtkhdf_htg(joinpath(dir, "htg_val.vtkhdf"); dimensions = (2, 2, 1))
+    common = (
+        depth_per_tree = [1], tree_ids = [0],
+        number_of_cells_per_tree_depth = [1],
+        xcoordinates = [0.0, 1.0], ycoordinates = [0.0, 1.0], zcoordinates = [0.0],
+    )
+    @test_throws ArgumentError add_piece(htg2; descriptors = [true], common...)  # too many bits
+    @test_throws ArgumentError add_piece(htg2; descriptors = Bool[], common..., tree_ids = [7])  # id out of range
+    @test_throws ArgumentError add_piece(
+        htg2; descriptors = [true],
+        depth_per_tree = [2], tree_ids = [0],
+        number_of_cells_per_tree_depth = [1, 3],  # 3 is not a multiple of 2^2
+        xcoordinates = [0.0, 1.0], ycoordinates = [0.0, 1.0], zcoordinates = [0.0],
+    )
+    add_piece(htg2; descriptors = Bool[], common...)
+    close(htg2)
 end

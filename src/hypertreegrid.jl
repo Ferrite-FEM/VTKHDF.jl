@@ -2,6 +2,7 @@
 
 mutable struct HTGState <: DatasetKind
     dims::NTuple{3, Int}
+    branch_factor::Int
     total_cells::Int
     npieces::Int
     any_mask::Bool
@@ -11,8 +12,10 @@ end
     vtkhdf_htg(filename; dimensions, branch_factor = 2, kwargs...)
 
 Create a VTKHDF `HyperTreeGrid` file. The grid of trees has `dimensions`
-(number of coordinate points per direction; `(n₁-1)·(n₂-1)·(n₃-1)` trees).
-Pieces (partitions) are appended with [`add_piece`](@ref).
+(number of coordinate points per direction); the number of trees is the
+product of `max(nᵢ - 1, 1)` over the directions (degenerate directions with a
+single coordinate do not contribute). Pieces (partitions) are appended with
+[`add_piece`](@ref).
 
 Optional keywords: `transposed_root_indexing::Bool`,
 `interface_normals_name`, `interface_intercepts_name`.
@@ -43,7 +46,7 @@ function init_htg(
     interface_intercepts_name === nothing ||
         write_ascii_attribute(root, "InterfaceInterceptsName", String(interface_intercepts_name))
     return make_vtkfile(
-        file, root, HTGState(Tuple(Int.(dimensions)), 0, 0, false);
+        file, root, HTGState(Tuple(Int.(dimensions)), Int(branch_factor), 0, 0, false);
         temporal = false, compress, chunk_size, version = (2, 4)
     )
 end
@@ -92,11 +95,41 @@ function add_piece(
         celldata = ()
     )
     vtk.isopen || error("file is closed")
+    vtk.failed && error("a previous write to this file failed; the file is incomplete")
     kind = vtk.kind
     length(depth_per_tree) == length(tree_ids) ||
         throw(ArgumentError("depth_per_tree and tree_ids must have equal length"))
+    all(>=(1), depth_per_tree) || throw(ArgumentError("tree depths must be at least 1"))
     length(number_of_cells_per_tree_depth) == sum(depth_per_tree; init = 0) ||
         throw(ArgumentError("number_of_cells_per_tree_depth must have sum(depth_per_tree) entries"))
+    all(>=(1), number_of_cells_per_tree_depth) ||
+        throw(ArgumentError("cell counts per tree depth must be at least 1"))
+    ntrees_total = prod(max(d - 1, 1) for d in kind.dims)
+    allunique(tree_ids) || throw(ArgumentError("tree_ids must be unique within a piece"))
+    all(id -> 0 <= id < ntrees_total, tree_ids) ||
+        throw(ArgumentError("tree_ids must be in 0:$(ntrees_total - 1)"))
+    # per-tree structure: the root level has one cell, every level fans out by
+    # at most branch_factor^dim, and only non-deepest levels carry descriptor
+    # bits
+    edim = count(>(1), kind.dims)
+    fanout = kind.branch_factor^edim
+    nbits = 0
+    offset = 0
+    for depth in depth_per_tree
+        counts = view(number_of_cells_per_tree_depth, (offset + 1):(offset + depth))
+        counts[1] == 1 || throw(ArgumentError("the root level of each tree must have exactly 1 cell"))
+        for d in 2:depth
+            counts[d] % fanout == 0 && counts[d] <= counts[d - 1] * fanout ||
+                throw(ArgumentError("invalid refinement: depth $d of a tree has $(counts[d]) cells after $(counts[d - 1]) cells (branch factor $(kind.branch_factor), $edim dimensions)"))
+        end
+        nbits += sum(counts) - counts[end]  # deepest level carries no bits
+        offset += depth
+    end
+    length(descriptors) == nbits || throw(
+        ArgumentError(
+            "descriptors must have exactly one bit per cell of every non-deepest tree level ($nbits), got $(length(descriptors))"
+        )
+    )
     ncells = sum(number_of_cells_per_tree_depth; init = 0)
     if mask !== nothing
         length(mask) == ncells ||
@@ -110,6 +143,11 @@ function add_piece(
     for (coords, n) in zip((xcoordinates, ycoordinates, zcoordinates), kind.dims)
         length(coords) == n ||
             throw(ArgumentError("coordinate vector length $(length(coords)) does not match dimensions $(kind.dims)"))
+    end
+    for (name, data) in celldata  # preflight before mutating the file
+        check_name(String(name))
+        n = tuple_count(data)
+        n == ncells || error("piece cell data $name has $n tuples, expected $ncells")
     end
     root = vtk.root
     append_rows(appendable(vtk, root, "XCoordinates", Float64, ()), Vector{Float64}(xcoordinates))
@@ -130,13 +168,30 @@ function add_piece(
     mask === nothing ||
         append_rows(appendable(vtk, root, "Mask", UInt8, ()), pack_bits(mask))
     for (name, data) in celldata
-        n = tuple_count(data)
-        n == ncells || error("piece cell data $name has $n tuples, expected $ncells")
         append_tuple_data!(vtk, "CellData", String(name), data)
     end
     kind.total_cells += ncells
     kind.npieces += 1
     return vtk
+end
+
+# an HTG closed without pieces still gets its (empty) datasets
+function finalize_kind!(vtk, kind::HTGState)
+    if kind.npieces == 0
+        root = vtk.root
+        for name in ("XCoordinates", "YCoordinates", "ZCoordinates")
+            appendable(vtk, root, name, Float64, ())
+        end
+        appendable(vtk, root, "Descriptors", UInt8, ())
+        for name in (
+                "DescriptorsSize", "TreeIds", "DepthPerTree",
+                "NumberOfCellsPerTreeDepth", "NumberOfTrees", "NumberOfDepths",
+                "NumberOfCells",
+            )
+            appendable(vtk, root, name, Int64, ())
+        end
+    end
+    return nothing
 end
 
 resolve_location(vtk, kind::HTGState, data) = VTKCellData()

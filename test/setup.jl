@@ -10,6 +10,13 @@ const HAS_VTK = PY !== nothing &&
 const HAS_H5DUMP = Sys.which("h5dump") !== nothing
 const VALIDATE = joinpath(@__DIR__, "vtk_validate.py")
 
+# On CI, at least one job must run the authoritative VTK/h5dump validation;
+# it sets this variable so that quietly skipping is impossible.
+if get(ENV, "WRITEVTKHDF_REQUIRE_VTK", "") == "true"
+    HAS_VTK || error("WRITEVTKHDF_REQUIRE_VTK is set but python3 + vtkmodules is not available")
+    HAS_H5DUMP || error("WRITEVTKHDF_REQUIRE_VTK is set but h5dump is not available")
+end
+
 # Read a file back through VTK's own reader as a JSON-compatible structure.
 vtkdump(path) = JSON.parse(read(pipeline(`$PY $VALIDATE $path`; stderr = devnull), String))
 
