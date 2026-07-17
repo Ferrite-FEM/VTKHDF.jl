@@ -1,0 +1,10 @@
+name = "WriteVTKHDF"
+uuid = "45d8cf6f-ab5f-45bc-ab92-77e36ab192e6"
+version = "0.1.0"
+authors = ["Kristoffer Carlsson <kcarlsson89@gmail.com>"]
+
+[deps]
+HDF5 = "f67ccb44-e63f-5c2f-98bd-6dc0ccc4ba2f"
+
+[compat]
+HDF5 = "0.17.3"
