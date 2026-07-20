@@ -5,7 +5,11 @@
 # time step at a time. The geometry is stored exactly once; each step
 # appends only its data arrays, together with per-step read offsets under
 # `/VTKHDF/Steps`. (Passing `points`/`cells` to `write_timestep` would
-# append updated geometry instead of reusing it.)
+# append updated geometry instead of reusing it.) The step at `t = 0.3` in
+# ParaView, warped by `displacement` and colored by `height`:
+#
+# ![Travelling wave at t = 0.3](../assets/examples/temporal_poly_data-light.png)
+# ![Travelling wave at t = 0.3](../assets/examples/temporal_poly_data-dark.png)
 
 using WriteVTKHDF
 

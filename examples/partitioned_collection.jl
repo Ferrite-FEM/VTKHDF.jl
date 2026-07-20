@@ -5,7 +5,12 @@
 # Assembly hierarchy grouping them. Blocks are written with the same API as
 # standalone files; assembly references are HDF5 soft links, and a block may
 # appear under several nodes. `vtkhdf_multiblock` writes a
-# MultiBlockDataSet the same way.
+# MultiBlockDataSet the same way. The two blocks in ParaView — `Solid`
+# colored by `Temperature`, with the `Surface` square moved aside (it
+# coincides with a face of the cube):
+#
+# ![Collection blocks: cube and square](../assets/examples/partitioned_collection-light.png)
+# ![Collection blocks: cube and square](../assets/examples/partitioned_collection-dark.png)
 
 using WriteVTKHDF
 

@@ -4,7 +4,11 @@
 # specification: a two-level overlapping AMR of a Gaussian pulse with the
 # same box layout as the reference file. Box extents are inclusive
 # cell-index ranges in each level's spacing; here the refinement ratio
-# between the levels is 2.
+# between the levels is 2. Clipped through the pulse center in ParaView; the
+# cell edges show the two refinement levels:
+#
+# ![AMR Gaussian pulse, clipped](../assets/examples/overlapping_amr-light.png)
+# ![AMR Gaussian pulse, clipped](../assets/examples/overlapping_amr-dark.png)
 
 using WriteVTKHDF
 

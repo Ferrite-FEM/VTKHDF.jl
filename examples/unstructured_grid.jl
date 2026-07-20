@@ -4,7 +4,11 @@
 # UnstructuredGrid written as three partitions (as a three-rank MPI
 # simulation would produce), each carrying point and cell data, plus a
 # global FieldData array. All partitions land in one file; VTK reads them
-# back as a partitioned dataset.
+# back as a partitioned dataset. The three partitions colored by `EQPS`, with
+# a few `VEL` arrow glyphs:
+#
+# ![Partitioned hexahedra mesh colored by EQPS](../assets/examples/unstructured_grid-light.png)
+# ![Partitioned hexahedra mesh colored by EQPS](../assets/examples/unstructured_grid-dark.png)
 
 using WriteVTKHDF
 
