@@ -1,11 +1,13 @@
-# WriteVTKHDF.jl
+# VTKHDF.jl
 
-Write VTK data in the
+Write and read VTK data in the
 [VTKHDF file format](https://docs.vtk.org/en/latest/vtk_file_formats/vtkhdf_file_format/index.html) —
 the HDF5-based successor to the VTK XML formats — readable by ParaView, VisIt
-and VTK. The package only writes files; it aims to feel familiar to
+and VTK. The writing API aims to feel familiar to
 [WriteVTK.jl](https://github.com/JuliaVTK/WriteVTK.jl) users and shares its
-cell/data types through [VTKBase.jl](https://github.com/JuliaVTK/VTKBase.jl).
+cell/data types through [VTKBase.jl](https://github.com/JuliaVTK/VTKBase.jl);
+[`vtkhdf_open`](@ref) reads the same files (and spec-conforming files from
+other writers) back.
 
 ## Why VTKHDF?
 
@@ -21,13 +23,13 @@ cell/data types through [VTKBase.jl](https://github.com/JuliaVTK/VTKBase.jl).
 ## Installation
 
 ```julia
-pkg> add https://github.com/Ferrite-FEM/WriteVTKHDF.jl
+pkg> add https://github.com/Ferrite-FEM/VTKHDF.jl
 ```
 
 ## Quick start
 
 ```julia
-using WriteVTKHDF
+using VTKHDF
 
 points = rand(3, 100)
 cells = [MeshCell(VTKCellTypes.VTK_TETRA, [1, 2, 3, 4])]
@@ -36,34 +38,39 @@ vtkhdf_grid("output", points, cells) do vtk
     vtk["temperature"] = rand(100)                  # point data (auto-detected)
     vtk["material", VTKCellData()] = [1]
 end
+
+vtkhdf_open("output") do r                          # read it back
+    r["temperature"], read_points(r), read_cells(r)
+end
 ```
 
-See the [Manual](@ref manual) for all dataset types and temporal writing, and
-the Examples section for complete programs — one per reference file of the
-VTKHDF specification.
+See the [Manual](@ref manual) for all dataset types, temporal writing and the
+reading API, and the Examples section for complete programs — one per
+reference file of the VTKHDF specification.
 
 ## Supported dataset types
 
-| VTKHDF type | write | temporal |
-|---|---|---|
-| UnstructuredGrid (incl. polyhedra, multiple partitions) | ✓ | ✓ |
-| PolyData (vertices/lines/polygons/strips) | ✓ | ✓ |
-| ImageData | ✓ | ✓ |
-| RectilinearGrid | ✓ | ✓ |
-| StructuredGrid | ✓ | ✓ |
-| Table | ✓ | ✓ |
-| OverlappingAMR | ✓ | – |
-| HyperTreeGrid | ✓ | – |
-| PartitionedDataSetCollection / MultiBlockDataSet | ✓ | ✓ |
+| VTKHDF type | write | read | temporal |
+|---|---|---|---|
+| UnstructuredGrid (incl. polyhedra, multiple partitions) | ✓ | ✓ | ✓ |
+| PolyData (vertices/lines/polygons/strips) | ✓ | ✓ | ✓ |
+| ImageData | ✓ | ✓ | ✓ |
+| RectilinearGrid | ✓ | ✓ | ✓ |
+| StructuredGrid | ✓ | ✓ | ✓ |
+| Table | ✓ | ✓ | ✓ |
+| OverlappingAMR | ✓ | ✓ | – |
+| HyperTreeGrid | ✓ | ✓ | – |
+| PartitionedDataSetCollection / MultiBlockDataSet | ✓ | ✓ | ✓ |
 
 Temporal OverlappingAMR/HyperTreeGrid and MPI-parallel collective writing are
 currently out of scope (VTK's own writer does not produce them either).
 
-!!! note "Reader support"
+!!! note "Opening files in ParaView/VTK"
     RectilinearGrid, StructuredGrid and Table are recent additions to the
-    VTKHDF specification (2.7/2.8) and require a VTK build new enough to read
-    them. All other types round-trip against VTK 9.6's `vtkHDFReader` in this
-    package's test suite.
+    VTKHDF specification (2.7/2.8) and require a VTK build new enough to
+    read them. All other types round-trip against VTK 9.6's `vtkHDFReader`
+    in this package's test suite. This package's own [reading
+    support](@ref manual) handles all types listed above.
 
 ## Development
 

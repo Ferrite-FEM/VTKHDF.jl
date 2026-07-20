@@ -11,11 +11,12 @@
 # ![Volume rendering of the Mandelbrot iteration count](../assets/examples/image_data-light.png)
 # ![Volume rendering of the Mandelbrot iteration count](../assets/examples/image_data-dark.png)
 
-using WriteVTKHDF
+using VTKHDF
 
 x = range(-1.75, 0.75; length = 20)
 y = range(-1.25, 1.25; length = 21)
 z = range(0.0, 2.0; length = 22)
+nothing #hide
 
 function iterations(c, w)
     for n in 1:100
@@ -25,7 +26,7 @@ function iterations(c, w)
     return Float32(100)
 end
 
-iters = [iterations(complex(xi, yi), complex(zi, 0)) for xi in x, yi in y, zi in z]
+iters = [iterations(complex(xi, yi), complex(zi, 0)) for xi in x, yi in y, zi in z];
 
 # A central-difference gradient of the iteration count, as a
 # `(3, nx, ny, nz)` vector field:
@@ -40,6 +41,7 @@ function gradient(f, spacing)
     end
     return g
 end
+nothing #hide
 
 # Point data shaped like the grid is detected automatically; `attribute`
 # marks the active scalars/vectors.
@@ -49,3 +51,24 @@ vtkhdf_grid("mandelbrot", x, y, z) do vtk
     vtk["IterationsGradient", VTKPointData(), attribute = :Vectors] =
         gradient(iters, step.((x, y, z)))
 end
+nothing #hide
+
+# ## Reading it back
+#
+# The grid metadata comes back through `grid_info`:
+
+r_mandel = vtkhdf_open("mandelbrot")
+VTKHDF.grid_info(r_mandel)
+
+# Arrays are read by indexing (image-like data keeps its full 3-D shape),
+# and the marked active attributes are queryable:
+
+size(r_mandel["Iterations"]), size(r_mandel["IterationsGradient"])
+
+#-
+
+VTKHDF.active_attributes(r_mandel, VTKPointData())
+
+#-
+
+close(r_mandel)

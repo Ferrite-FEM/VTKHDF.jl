@@ -1,8 +1,8 @@
 using Documenter
 using Literate
-using WriteVTKHDF
+using VTKHDF
 
-# One example per dataset type of the VTKHDF specification's reference files.
+# One example per reference file shown in the VTKHDF specification.
 const EXAMPLES = [
     "image_data.jl",
     "unstructured_grid.jl",
@@ -13,9 +13,11 @@ const EXAMPLES = [
 ]
 
 for ex in EXAMPLES
+    # `@example` blocks: Documenter runs the example during the docs build,
+    # so the reading sections show their actual output.
     Literate.markdown(
         joinpath(@__DIR__, "..", "examples", ex), joinpath(@__DIR__, "src", "examples");
-        credit = false, codefence = "```julia" => "```"
+        credit = false, codefence = "```@example $(splitext(ex)[1])" => "```"
     )
 end
 
@@ -28,7 +30,7 @@ example_title(ex) = strip(chopprefix(readline(joinpath(@__DIR__, "..", "examples
 # so they depend on whether the page ends up as overview.html or overview/index.html.
 open(joinpath(@__DIR__, "src", "examples", "overview.md"), "w") do io
     println(io, "# Examples\n")
-    println(io, "One example per dataset type of the VTKHDF specification, ported from its reference files. Click an example to see the code that writes the file.\n")
+    println(io, "One example per reference file shown in the VTKHDF specification, ported to this package. Click an example to see the code that writes (and reads back) the file.\n")
     println(io, "```@raw html")
     println(io, "<div class=\"example-gallery\">")
     for ex in EXAMPLES
@@ -47,8 +49,8 @@ open(joinpath(@__DIR__, "src", "examples", "overview.md"), "w") do io
 end
 
 makedocs(
-    sitename = "WriteVTKHDF.jl",
-    modules = [WriteVTKHDF],
+    sitename = "VTKHDF.jl",
+    modules = [VTKHDF],
     pages = [
         "Home" => "index.md",
         "Manual" => "manual.md",
@@ -60,13 +62,13 @@ makedocs(
     ],
     format = Documenter.HTML(
         prettyurls = prettyurls,
-        canonical = "https://ferrite-fem.github.io/WriteVTKHDF.jl",
+        canonical = "https://ferrite-fem.github.io/VTKHDF.jl",
         assets = ["assets/custom.css"],
     ),
     checkdocs = :exports,
 )
 
 deploydocs(
-    repo = "github.com/Ferrite-FEM/WriteVTKHDF.jl.git",
+    repo = "github.com/Ferrite-FEM/VTKHDF.jl.git",
     push_preview = true,
 )

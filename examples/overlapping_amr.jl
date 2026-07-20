@@ -10,10 +10,11 @@
 # ![AMR Gaussian pulse, clipped](../assets/examples/overlapping_amr-light.png)
 # ![AMR Gaussian pulse, clipped](../assets/examples/overlapping_amr-dark.png)
 
-using WriteVTKHDF
+using VTKHDF
 
 origin = (-2.0, -2.0, 0.0)
 center = (-0.75, -0.75, 1.25)
+nothing #hide
 
 # Cell centroids of a box, as a `(3, ncells)` matrix (x fastest, VTK order):
 
@@ -36,3 +37,24 @@ vtkhdf_amr("gaussian_pulse"; origin) do amr
     add_pulse_box(level1, (0, 3, 0, 5, 0, 9), (0.25, 0.25, 0.25))
     add_pulse_box(level1, (6, 9, 4, 9, 0, 9), (0.25, 0.25, 0.25))
 end
+nothing #hide
+
+# ## Reading it back
+#
+# Levels are addressed by their on-disk number; each level exposes its
+# spacing, boxes and (box-concatenated) data arrays:
+
+r = vtkhdf_open("gaussian_pulse")
+level1 = VTKHDF.amr_level(r, 1)
+
+#-
+
+VTKHDF.level_info(level1)
+
+#-
+
+length(level1["Gaussian-Pulse"])
+
+#-
+
+close(r)

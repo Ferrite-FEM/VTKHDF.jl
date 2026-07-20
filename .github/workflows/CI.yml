@@ -40,7 +40,8 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install VTK (round-trip validation)
-        run: pip install vtk
+        # >= 9.3 for vtkHDFWriter, which backs the reader-interop tests
+        run: pip install 'vtk>=9.3'
         continue-on-error: ${{ runner.os != 'Linux' }}
       - name: Install h5dump
         if: runner.os == 'Linux'
@@ -49,7 +50,7 @@ jobs:
       - uses: julia-actions/julia-runtest@v1
         env:
           # the VTK round-trip validation must actually run on Linux
-          WRITEVTKHDF_REQUIRE_VTK: ${{ runner.os == 'Linux' && 'true' || 'false' }}
+          VTKHDF_REQUIRE_VTK: ${{ runner.os == 'Linux' && 'true' || 'false' }}
 
   docs:
     name: Documentation
