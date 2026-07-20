@@ -83,6 +83,23 @@
         number_of_cells_per_tree_depth = [1, 3],  # 3 is not a multiple of 2^2
         xcoordinates = [0.0, 1.0], ycoordinates = [0.0, 1.0], zcoordinates = [0.0],
     )
+    @test_throws ArgumentError add_piece(
+        htg2; descriptors = [false],  # an unrefined root cannot have children
+        depth_per_tree = [2], tree_ids = [0],
+        number_of_cells_per_tree_depth = [1, 4],
+        xcoordinates = [0.0, 1.0], ycoordinates = [0.0, 1.0], zcoordinates = [0.0],
+    )
     add_piece(htg2; descriptors = Bool[], common...)
     close(htg2)
+
+    # refined cells cannot be masked (leaves can)
+    htg3 = vtkhdf_htg(joinpath(dir, "htg_maskref.vtkhdf"); dimensions = (2, 2, 1))
+    refined = (
+        descriptors = [true], depth_per_tree = [2], tree_ids = [0],
+        number_of_cells_per_tree_depth = [1, 4],
+        xcoordinates = [0.0, 1.0], ycoordinates = [0.0, 1.0], zcoordinates = [0.0],
+    )
+    @test_throws ArgumentError add_piece(htg3; refined..., mask = [true, false, false, false, false])
+    add_piece(htg3; refined..., mask = [false, true, false, false, false])
+    close(htg3)
 end

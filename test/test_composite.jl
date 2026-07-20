@@ -96,6 +96,21 @@
         end
     end
 
+    @testset "failed block construction rolls back" begin
+        fn = joinpath(dir, "rollback.vtkhdf")
+        col = vtkhdf_collection(fn)
+        @test_throws ArgumentError vtkhdf_grid(col, "Bad", cube, hex; compress = 10)
+        @test_throws ArgumentError vtkhdf_htg(col, "BadHTG"; dimensions = (2, 2))
+        good = vtkhdf_grid(col, "Good", cube, hex)
+        close(col)
+        h5open(fn) do f
+            g = f["VTKHDF"]
+            @test !haskey(g, "Bad")
+            @test !haskey(g, "BadHTG")
+            @test attrs(g["Good"])["Index"] == 0  # the failed blocks freed their indices
+        end
+    end
+
     @testset "mismatched block time values throw" begin
         fn = joinpath(dir, "tbad.vtkhdf")
         col = vtkhdf_collection(fn)

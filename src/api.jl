@@ -103,8 +103,11 @@ function vtkhdf_grid(dest::Dest, coords::Vararg{AbstractVector{<:Real}, N}; kwar
     return register_and_init(dest, init_rectilinear, x, y, z; kwargs...)
 end
 
-vtkhdf_grid(::VTKImageData, dest::Dest, dims::Tuple{Vararg{Integer}}; kwargs...) =
-    register_and_init(dest, init_image, ntuple(i -> i <= length(dims) ? Int(dims[i]) : 1, 3); kwargs...)
+function vtkhdf_grid(::VTKImageData, dest::Dest, dims::Tuple{Vararg{Integer}}; kwargs...)
+    1 <= length(dims) <= 3 ||
+        throw(ArgumentError("dimensions must have 1 to 3 entries, got $(length(dims))"))
+    return register_and_init(dest, init_image, ntuple(i -> i <= length(dims) ? Int(dims[i]) : 1, 3); kwargs...)
+end
 vtkhdf_grid(
     ::VTKRectilinearGrid, dest::Dest, x::AbstractVector{<:Real},
     y::AbstractVector{<:Real} = [0.0], z::AbstractVector{<:Real} = [0.0]; kwargs...
@@ -131,6 +134,26 @@ end
 register_and_init(dest, init, args...; kwargs...) =
     register_block(dest, init(dest, args...; kwargs...))
 
+# Composite blocks: roll back the block group and its index when construction
+# fails after the group was created (invalid options, bad geometry, ...), so a
+# caller that catches the error is not left with an orphan block.
+function register_and_init(dest::BlockDest, init, args...; kwargs...)
+    col = dest.col
+    col.isopen || error("collection is closed")
+    check_name(dest.name, "block name")
+    preexisting = haskey(col.root, dest.name)
+    saved_index = col.next_index
+    try
+        return register_block(dest, init(dest, args...; kwargs...))
+    catch
+        if !preexisting && haskey(col.root, dest.name)
+            HDF5.delete_object(col.root, dest.name)
+            col.next_index = saved_index
+        end
+        rethrow()
+    end
+end
+
 # tag-second form, so `vtkhdf_grid(col, "name", VTKImageData(), ...)` works
 vtkhdf_grid(dest::Dest, tag::AbstractVTKDataset, args...; kwargs...) =
     vtkhdf_grid(tag, dest, args...; kwargs...)
@@ -156,9 +179,9 @@ for fn in (:vtkhdf_grid, :vtkhdf_table, :vtkhdf_amr, :vtkhdf_htg)
     @eval $fn(col::VTKHDFCollection, name::AbstractString, args...; kwargs...) =
         $fn(BlockDest(col, name), args...; kwargs...)
 end
-vtkhdf_table(dest::BlockDest; kwargs...) = register_block(dest, init_table(dest; kwargs...))
-vtkhdf_amr(dest::BlockDest; kwargs...) = register_block(dest, init_amr(dest; kwargs...))
-vtkhdf_htg(dest::BlockDest; kwargs...) = register_block(dest, init_htg(dest; kwargs...))
+vtkhdf_table(dest::BlockDest; kwargs...) = register_and_init(dest, init_table; kwargs...)
+vtkhdf_amr(dest::BlockDest; kwargs...) = register_and_init(dest, init_amr; kwargs...)
+vtkhdf_htg(dest::BlockDest; kwargs...) = register_and_init(dest, init_htg; kwargs...)
 
 # -- do-block forms --
 for fn in (

@@ -44,11 +44,18 @@
     vtk["u", VTKPointData()] = rand(8)
     vtk["u2", VTKPointData()] = rand(4)  # explicit location skips length check...
     @test_throws ErrorException close(vtk) # ...but close validates totals
+    @test !vtk.isopen  # handles are released even when close throws
+    close(vtk)         # and a second close is a no-op
+    h5open(joinpath(dir, "e7.vtkhdf"), "r") do f
+        @test haskey(f, "VTKHDF")
+    end
 
     # NUL bytes and unknown attribute kinds are rejected (UTF-8 itself is fine)
     vtk = vtkhdf_grid(joinpath(dir, "e8"), cube, hex)
     @test_throws ArgumentError vtk["a\0b"] = rand(8)
     @test_throws ArgumentError vtk["u", VTKPointData(), attribute = :NotAThing] = rand(8)
+    # the rejected attribute wrote nothing: the same name is still free
+    vtk["u", VTKPointData(), attribute = :Scalars] = rand(8)
     vtk["ünicode"] = rand(8)
     close(vtk)
 
@@ -89,8 +96,18 @@
     add_partition(vtk, cube, hex; pointdata = ("u" => rand(Float64, 8),))
     @test_throws ErrorException add_partition(vtk, Float32.(cube), hex)
     @test_throws ErrorException vtk["u", VTKPointData()] = rand(Float32, 8)
+    # a partition rejected for a data mismatch is preflighted: nothing written
+    @test_throws ErrorException add_partition(vtk, cube .+ 2, hex; pointdata = ("u" => rand(Float32, 8),))
+    @test !vtk.failed
     add_partition(vtk, cube .+ 2, hex; pointdata = ("u" => rand(Float64, 8),))
     close(vtk)
+    h5open(joinpath(dir, "eeltype.vtkhdf")) do f
+        @test length(f["VTKHDF/NumberOfPoints"]) == 2  # only the accepted partitions
+    end
+
+    # explicit ImageData dimensions must have 1 to 3 entries
+    @test_throws ArgumentError vtkhdf_grid(VTKImageData(), joinpath(dir, "edims"), (2, 3, 4, 9))
+    @test_throws ArgumentError vtkhdf_grid(VTKImageData(), joinpath(dir, "edims"), ())
 
     # out-of-range connectivity is rejected before anything is written
     @test_throws ArgumentError vtkhdf_grid(

@@ -82,37 +82,39 @@ function add_partition(
     cats = poly_categorize(cellvecs)
     topos = map(cat -> PartitionTopology(cat, npoints), cats)
     ncells_part = sum(n_cells, topos)
-    preflight_partition_data(pointdata, npoints, "point")
-    preflight_partition_data(celldata, ncells_part, "cell")
+    preflight_partition_data(vtk, pointdata, npoints, VTKPointData(), "point")
+    preflight_partition_data(vtk, celldata, ncells_part, VTKCellData(), "cell")
     root = vtk.root
     check_points_eltype(root, eltype(pts))
-    append_rows(appendable(vtk, root, "Points", eltype(pts), (3,)), pts)
-    append_rows(appendable(vtk, root, "NumberOfPoints", Int64, ()), Int64(npoints))
-    newcells = Int[]
-    newconn = Int[]
-    for (i, catname) in enumerate(POLY_CATEGORIES)
-        grp = get_or_create_group(root, catname)
-        topo = topos[i]
-        append_rows(appendable(vtk, grp, "Connectivity", Int64, ()), topo.connectivity)
-        append_rows(appendable(vtk, grp, "Offsets", Int64, ()), topo.offsets)
-        append_rows(appendable(vtk, grp, "NumberOfCells", Int64, ()), Int64(n_cells(topo)))
-        append_rows(appendable(vtk, grp, "NumberOfConnectivityIds", Int64, ()), Int64(length(topo.connectivity)))
-        push!(newcells, n_cells(topo))
-        push!(newconn, length(topo.connectivity))
+    mutating(vtk) do
+        append_rows(appendable(vtk, root, "Points", eltype(pts), (3,)), pts)
+        append_rows(appendable(vtk, root, "NumberOfPoints", Int64, ()), Int64(npoints))
+        newcells = Int[]
+        newconn = Int[]
+        for (i, catname) in enumerate(POLY_CATEGORIES)
+            grp = get_or_create_group(root, catname)
+            topo = topos[i]
+            append_rows(appendable(vtk, grp, "Connectivity", Int64, ()), topo.connectivity)
+            append_rows(appendable(vtk, grp, "Offsets", Int64, ()), topo.offsets)
+            append_rows(appendable(vtk, grp, "NumberOfCells", Int64, ()), Int64(n_cells(topo)))
+            append_rows(appendable(vtk, grp, "NumberOfConnectivityIds", Int64, ()), Int64(length(topo.connectivity)))
+            push!(newcells, n_cells(topo))
+            push!(newconn, length(topo.connectivity))
+        end
+        kind.total_points += npoints
+        kind.total_cells = ntuple(i -> kind.total_cells[i] + newcells[i], 4)
+        kind.total_conn = ntuple(i -> kind.total_conn[i] + newconn[i], 4)
+        kind.total_parts += 1
+        if vtk.in_step
+            kind.step_parts += 1
+            kind.step_points += npoints
+            kind.step_cells += ncells_part
+        else
+            kind.geom = geometry_ref(kind, ntuple(_ -> 0, 10))
+        end
+        write_partition_data(vtk, pointdata, VTKPointData(), npoints)
+        write_partition_data(vtk, celldata, VTKCellData(), ncells_part)
     end
-    kind.total_points += npoints
-    kind.total_cells = ntuple(i -> kind.total_cells[i] + newcells[i], 4)
-    kind.total_conn = ntuple(i -> kind.total_conn[i] + newconn[i], 4)
-    kind.total_parts += 1
-    if vtk.in_step
-        kind.step_parts += 1
-        kind.step_points += npoints
-        kind.step_cells += ncells_part
-    else
-        kind.geom = geometry_ref(kind, ntuple(_ -> 0, 10))
-    end
-    write_partition_data(vtk, pointdata, VTKPointData(), npoints)
-    write_partition_data(vtk, celldata, VTKCellData(), ncells_part)
     return vtk
 end
 

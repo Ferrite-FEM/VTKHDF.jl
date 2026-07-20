@@ -39,9 +39,12 @@ const ATTRIBUTE_KINDS = (
     :HigherOrderDegrees, :ProcessIds,
 )
 
+check_attribute_kind(attribute::Symbol) =
+    attribute in ATTRIBUTE_KINDS ? nothing :
+    throw(ArgumentError("unknown attribute kind $attribute; expected one of $(ATTRIBUTE_KINDS)"))
+
 function mark_attribute(vtk, group, name::AbstractString, attribute::Symbol)
-    attribute in ATTRIBUTE_KINDS ||
-        throw(ArgumentError("unknown attribute kind $attribute; expected one of $(ATTRIBUTE_KINDS)"))
+    check_attribute_kind(attribute)
     write_ascii_attribute(group, String(attribute), String(name))
     write_ascii_attribute(group[name], "Attribute", String(attribute))
     bump_version!(vtk, (2, 6))

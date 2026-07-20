@@ -77,46 +77,49 @@ function add_partition(
     npoints, pts = prepare_points(points)
     topo = PartitionTopology(cells, npoints)
     # preflight everything before the first HDF5 mutation
-    preflight_partition_data(pointdata, npoints, "point")
-    preflight_partition_data(celldata, n_cells(topo), "cell")
+    preflight_partition_data(vtk, pointdata, npoints, VTKPointData(), "point")
+    preflight_partition_data(vtk, celldata, n_cells(topo), VTKCellData(), "cell")
     root = vtk.root
     check_points_eltype(root, eltype(pts))
-    append_rows(appendable(vtk, root, "Points", eltype(pts), (3,)), pts)
-    append_rows(appendable(vtk, root, "Connectivity", Int64, ()), topo.connectivity)
-    append_rows(appendable(vtk, root, "Offsets", Int64, ()), topo.offsets)
-    append_rows(appendable(vtk, root, "Types", UInt8, ()), topo.types)
-    append_rows(appendable(vtk, root, "NumberOfPoints", Int64, ()), Int64(npoints))
-    append_rows(appendable(vtk, root, "NumberOfCells", Int64, ()), Int64(n_cells(topo)))
-    append_rows(appendable(vtk, root, "NumberOfConnectivityIds", Int64, ()), Int64(length(topo.connectivity)))
-    if topo.n_polyhedra > 0 && !kind.has_polyhedra
-        enable_polyhedra!(vtk)
+    mutating(vtk) do
+        append_rows(appendable(vtk, root, "Points", eltype(pts), (3,)), pts)
+        append_rows(appendable(vtk, root, "Connectivity", Int64, ()), topo.connectivity)
+        append_rows(appendable(vtk, root, "Offsets", Int64, ()), topo.offsets)
+        append_rows(appendable(vtk, root, "Types", UInt8, ()), topo.types)
+        append_rows(appendable(vtk, root, "NumberOfPoints", Int64, ()), Int64(npoints))
+        append_rows(appendable(vtk, root, "NumberOfCells", Int64, ()), Int64(n_cells(topo)))
+        append_rows(appendable(vtk, root, "NumberOfConnectivityIds", Int64, ()), Int64(length(topo.connectivity)))
+        if topo.n_polyhedra > 0 && !kind.has_polyhedra
+            enable_polyhedra!(vtk)
+        end
+        if kind.has_polyhedra
+            append_polyhedron_partition!(vtk, topo)
+        end
+        kind.total_points += npoints
+        kind.total_cells += n_cells(topo)
+        kind.total_conn += length(topo.connectivity)
+        kind.total_parts += 1
+        push!(kind.part_cells, n_cells(topo))
+        if vtk.in_step
+            kind.step_parts += 1
+            kind.step_points += npoints
+            kind.step_cells += n_cells(topo)
+        else
+            # geometry added at construction time; usable (and reused) by steps
+            kind.geom = geometry_ref(kind, (0, 0, 0, 0, 0, 0, 0))
+        end
+        write_partition_data(vtk, pointdata, VTKPointData(), npoints)
+        write_partition_data(vtk, celldata, VTKCellData(), n_cells(topo))
     end
-    if kind.has_polyhedra
-        append_polyhedron_partition!(vtk, topo)
-    end
-    kind.total_points += npoints
-    kind.total_cells += n_cells(topo)
-    kind.total_conn += length(topo.connectivity)
-    kind.total_parts += 1
-    push!(kind.part_cells, n_cells(topo))
-    if vtk.in_step
-        kind.step_parts += 1
-        kind.step_points += npoints
-        kind.step_cells += n_cells(topo)
-    else
-        # geometry added at construction time; usable (and reused) by steps
-        kind.geom = geometry_ref(kind, (0, 0, 0, 0, 0, 0, 0))
-    end
-    write_partition_data(vtk, pointdata, VTKPointData(), npoints)
-    write_partition_data(vtk, celldata, VTKCellData(), n_cells(topo))
     return vtk
 end
 
-function preflight_partition_data(pairs, expected::Int, what::String)
+function preflight_partition_data(vtk, pairs, expected::Int, loc, what::String)
     for (name, data) in pairs
         check_name(String(name))
         n = tuple_count(data)
         n == expected || error("partition $what data $name has $n tuples, expected $expected")
+        check_tuple_data(vtk, location_group(loc), String(name), data)
     end
     return nothing
 end

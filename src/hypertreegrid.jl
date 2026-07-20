@@ -71,14 +71,17 @@ end
 
 Append one piece (partition) to a HyperTreeGrid file:
 
-- `descriptors::AbstractVector{Bool}`: refinement bits, level by level, for all
-  trees of the piece (deepest level excluded); bit-packed MSB-first on disk.
+- `descriptors::AbstractVector{Bool}`: refinement bits for each tree in turn,
+  level by level within the tree (each tree's deepest level carries no bits);
+  bit-packed MSB-first on disk. Each refined cell must have exactly
+  `branch_factor^dim` cells on the next level.
 - `depth_per_tree`, `tree_ids`: depth and id of each tree in the piece.
 - `number_of_cells_per_tree_depth`: cells per depth, tree by tree
   (`sum(depth_per_tree)` entries); its total is the piece's cell count.
 - `x/y/zcoordinates`: tree coordinates for this piece (lengths matching
   `dimensions`).
-- `mask`: optional `AbstractVector{Bool}` of length equal to the cell count.
+- `mask`: optional `AbstractVector{Bool}` of length equal to the cell count,
+  in descriptor cell order; refined cells cannot be masked.
 - `celldata`: iterable of `name => array` pairs (HyperTreeGrids have no point
   data).
 """
@@ -108,9 +111,8 @@ function add_piece(
     allunique(tree_ids) || throw(ArgumentError("tree_ids must be unique within a piece"))
     all(id -> 0 <= id < ntrees_total, tree_ids) ||
         throw(ArgumentError("tree_ids must be in 0:$(ntrees_total - 1)"))
-    # per-tree structure: the root level has one cell, every level fans out by
-    # at most branch_factor^dim, and only non-deepest levels carry descriptor
-    # bits
+    # per-tree structure: the root level has one cell, and only non-deepest
+    # levels carry descriptor bits
     edim = count(>(1), kind.dims)
     fanout = kind.branch_factor^edim
     nbits = 0
@@ -118,10 +120,6 @@ function add_piece(
     for depth in depth_per_tree
         counts = view(number_of_cells_per_tree_depth, (offset + 1):(offset + depth))
         counts[1] == 1 || throw(ArgumentError("the root level of each tree must have exactly 1 cell"))
-        for d in 2:depth
-            counts[d] % fanout == 0 && counts[d] <= counts[d - 1] * fanout ||
-                throw(ArgumentError("invalid refinement: depth $d of a tree has $(counts[d]) cells after $(counts[d - 1]) cells (branch factor $(kind.branch_factor), $edim dimensions)"))
-        end
         nbits += sum(counts) - counts[end]  # deepest level carries no bits
         offset += depth
     end
@@ -136,9 +134,36 @@ function add_piece(
             throw(ArgumentError("mask must have one entry per cell ($ncells), got $(length(mask))"))
         kind.npieces > 0 && !kind.any_mask &&
             throw(ArgumentError("either all pieces or no piece must define a mask"))
-        kind.any_mask = true
     elseif kind.any_mask
         throw(ArgumentError("either all pieces or no piece must define a mask"))
+    end
+    # the descriptor bits must produce exactly the next level's cells, and a
+    # refined cell cannot be masked (both required by the VTKHDF spec)
+    bit = 0
+    cell = 0
+    offset = 0
+    for depth in depth_per_tree
+        counts = view(number_of_cells_per_tree_depth, (offset + 1):(offset + depth))
+        for d in 1:(depth - 1)
+            nrefined = 0
+            for j in 1:counts[d]
+                descriptors[bit + j] || continue
+                nrefined += 1
+                mask !== nothing && mask[cell + j] &&
+                    throw(ArgumentError("refined cells cannot be masked (cell $(cell + j) of the piece)"))
+            end
+            counts[d + 1] == nrefined * fanout || throw(
+                ArgumentError(
+                    "invalid refinement: depth $(d + 1) of a tree has $(counts[d + 1]) cells, but its " *
+                        "descriptors refine $nrefined cells at depth $d (branch factor " *
+                        "$(kind.branch_factor), $edim dimensions => $(nrefined * fanout) cells)"
+                )
+            )
+            bit += counts[d]
+            cell += counts[d]
+        end
+        cell += counts[depth]  # deepest-level cells carry no descriptor bits
+        offset += depth
     end
     for (coords, n) in zip((xcoordinates, ycoordinates, zcoordinates), kind.dims)
         length(coords) == n ||
@@ -148,30 +173,34 @@ function add_piece(
         check_name(String(name))
         n = tuple_count(data)
         n == ncells || error("piece cell data $name has $n tuples, expected $ncells")
+        check_tuple_data(vtk, "CellData", String(name), data)
     end
     root = vtk.root
-    append_rows(appendable(vtk, root, "XCoordinates", Float64, ()), Vector{Float64}(xcoordinates))
-    append_rows(appendable(vtk, root, "YCoordinates", Float64, ()), Vector{Float64}(ycoordinates))
-    append_rows(appendable(vtk, root, "ZCoordinates", Float64, ()), Vector{Float64}(zcoordinates))
-    # Descriptors and Mask are bit-packed; every piece starts on a fresh byte.
-    append_rows(appendable(vtk, root, "Descriptors", UInt8, ()), pack_bits(descriptors))
-    append_rows(appendable(vtk, root, "DescriptorsSize", Int64, ()), Int64(length(descriptors)))
-    append_rows(appendable(vtk, root, "TreeIds", Int64, ()), Vector{Int64}(tree_ids))
-    append_rows(appendable(vtk, root, "DepthPerTree", Int64, ()), Vector{Int64}(depth_per_tree))
-    append_rows(
-        appendable(vtk, root, "NumberOfCellsPerTreeDepth", Int64, ()),
-        Vector{Int64}(number_of_cells_per_tree_depth)
-    )
-    append_rows(appendable(vtk, root, "NumberOfTrees", Int64, ()), Int64(length(tree_ids)))
-    append_rows(appendable(vtk, root, "NumberOfDepths", Int64, ()), Int64(length(number_of_cells_per_tree_depth)))
-    append_rows(appendable(vtk, root, "NumberOfCells", Int64, ()), Int64(ncells))
-    mask === nothing ||
-        append_rows(appendable(vtk, root, "Mask", UInt8, ()), pack_bits(mask))
-    for (name, data) in celldata
-        append_tuple_data!(vtk, "CellData", String(name), data)
+    mutating(vtk) do
+        append_rows(appendable(vtk, root, "XCoordinates", Float64, ()), Vector{Float64}(xcoordinates))
+        append_rows(appendable(vtk, root, "YCoordinates", Float64, ()), Vector{Float64}(ycoordinates))
+        append_rows(appendable(vtk, root, "ZCoordinates", Float64, ()), Vector{Float64}(zcoordinates))
+        # Descriptors and Mask are bit-packed; every piece starts on a fresh byte.
+        append_rows(appendable(vtk, root, "Descriptors", UInt8, ()), pack_bits(descriptors))
+        append_rows(appendable(vtk, root, "DescriptorsSize", Int64, ()), Int64(length(descriptors)))
+        append_rows(appendable(vtk, root, "TreeIds", Int64, ()), Vector{Int64}(tree_ids))
+        append_rows(appendable(vtk, root, "DepthPerTree", Int64, ()), Vector{Int64}(depth_per_tree))
+        append_rows(
+            appendable(vtk, root, "NumberOfCellsPerTreeDepth", Int64, ()),
+            Vector{Int64}(number_of_cells_per_tree_depth)
+        )
+        append_rows(appendable(vtk, root, "NumberOfTrees", Int64, ()), Int64(length(tree_ids)))
+        append_rows(appendable(vtk, root, "NumberOfDepths", Int64, ()), Int64(length(number_of_cells_per_tree_depth)))
+        append_rows(appendable(vtk, root, "NumberOfCells", Int64, ()), Int64(ncells))
+        mask === nothing ||
+            append_rows(appendable(vtk, root, "Mask", UInt8, ()), pack_bits(mask))
+        for (name, data) in celldata
+            append_tuple_data!(vtk, "CellData", String(name), data)
+        end
+        kind.total_cells += ncells
+        kind.npieces += 1
+        mask === nothing || (kind.any_mask = true)
     end
-    kind.total_cells += ncells
-    kind.npieces += 1
     return vtk
 end
 

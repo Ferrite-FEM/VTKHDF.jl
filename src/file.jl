@@ -56,25 +56,29 @@ end
 function Base.close(vtk::VTKHDFFile)
     vtk.isopen || return nothing
     vtk.in_step && error("close called inside write_timestep")
-    if vtk.failed
-        @warn "closing a VTKHDF file after a failed write; the file is incomplete"
-    elseif vtk.temporal
-        if vtk.nsteps == 0
-            @warn "closing temporal VTKHDF file without any time steps"
-            # materialize an empty but complete Steps layout
-            sg = steps_group(vtk)
-            appendable(vtk, sg, "Values", Float64, ())
+    try
+        if vtk.failed
+            @warn "closing a VTKHDF file after a failed write; the file is incomplete"
+        elseif vtk.temporal
+            if vtk.nsteps == 0
+                @warn "closing temporal VTKHDF file without any time steps"
+                # materialize an empty but complete Steps layout
+                sg = steps_group(vtk)
+                appendable(vtk, sg, "Values", Float64, ())
+            end
+            finalize_kind!(vtk, vtk.kind)
+        else
+            validate_static_data(vtk)
+            finalize_kind!(vtk, vtk.kind)
         end
-        finalize_kind!(vtk, vtk.kind)
-    else
-        validate_static_data(vtk)
-        finalize_kind!(vtk, vtk.kind)
+        write_version_attribute(vtk.root, vtk.version)
+    finally
+        # release the HDF5 handles even when validation/finalization throws
+        vtk.isopen = false
+        close(vtk.root)
+        file = vtk.file
+        file === nothing || close(file)
     end
-    write_version_attribute(vtk.root, vtk.version)
-    vtk.isopen = false
-    close(vtk.root)
-    file = vtk.file
-    file === nothing || close(file)
     return nothing
 end
 
@@ -112,15 +116,17 @@ function set_data!(vtk::VTKHDFFile, data, name::AbstractString, loc; attribute)
         error("temporal file: data must be written inside write_timestep")
     end
     locr = loc === nothing ? resolve_location(vtk, vtk.kind, data) : loc
+    if attribute !== nothing  # validated before anything is written
+        locr isa VTKFieldData && throw(ArgumentError("attribute marking not supported for field data"))
+        check_attribute_kind(attribute)
+    end
     if locr isa VTKFieldData && (data isa AbstractString || data isa AbstractVector{<:AbstractString})
         write_string_field!(vtk, name, data)
     else
         write_array!(vtk, vtk.kind, locr, name, data)
     end
-    if attribute !== nothing
-        loc isa VTKFieldData && throw(ArgumentError("attribute marking not supported for field data"))
+    attribute === nothing ||
         mark_attribute(vtk, vtk.root[location_group(locr)], name, attribute)
-    end
     return data
 end
 
@@ -165,6 +171,42 @@ function append_tuple_data!(vtk::VTKHDFFile, groupname::String, name::AbstractSt
     append_rows(ds, arr)
     vtk.data_rows[key] = get(vtk.data_rows, key, 0) + n
     return nothing
+end
+
+# Validation half of append_tuple_data! — everything that can throw, without
+# touching the file. Used to preflight multi-array operations so a failure
+# cannot leave the file partially mutated.
+function check_tuple_data(vtk::VTKHDFFile, groupname::String, name::AbstractString, data)
+    ncomp, _, arr = prepare_tuples(data)
+    key = groupname * "/" * name
+    if vtk.schema !== nothing && !(key in vtk.schema)
+        error("array $key was not part of the first time step; the array schema is fixed by the first step")
+    end
+    if haskey(vtk.root, groupname)
+        grp = vtk.root[groupname]::HDF5.Group
+        if haskey(grp, name)
+            ds = get_dataset(grp, name)
+            eltype(ds) == eltype(arr) ||
+                error("array $key changes element type ($(eltype(ds)) -> $(eltype(arr)))")
+        end
+    end
+    if groupname == "FieldData"
+        known = get(vtk.field_ncomp, key, ncomp)
+        known == ncomp || error("field array $key changes component count ($known -> $ncomp)")
+    end
+    return nothing
+end
+
+# Run `f`, which appends to the file; a throw midway leaves the on-disk state
+# out of sync with the bookkeeping, so mark the file failed (all further
+# writes are then rejected).
+function mutating(f::Function, vtk::VTKHDFFile)
+    try
+        return f()
+    catch
+        vtk.failed = true
+        rethrow()
+    end
 end
 
 # Number of tuples in `data` without materializing the conversion.

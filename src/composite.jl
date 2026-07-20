@@ -169,22 +169,30 @@ end
 
 function Base.close(col::VTKHDFCollection)
     col.isopen || return nothing
-    # temporal blocks must agree on their time values
-    ref = nothing
-    for blk in col.blocks
-        blk.temporal || continue
-        if ref === nothing
-            ref = blk.step_values
-        elseif blk.step_values != ref
-            error("temporal blocks have different time steps: $(blk.step_values) vs $ref")
+    try
+        # temporal blocks must agree on their time values
+        ref = nothing
+        for blk in col.blocks
+            blk.temporal || continue
+            if ref === nothing
+                ref = blk.step_values
+            elseif blk.step_values != ref
+                error("temporal blocks have different time steps: $(blk.step_values) vs $ref")
+            end
         end
+        for blk in col.blocks
+            close(blk)
+        end
+    finally
+        # release the file even when a block fails validation; closing the
+        # file (strong close degree) also closes any remaining block handles
+        col.isopen = false
+        for blk in col.blocks
+            blk.isopen = false
+        end
+        close(col.root)
+        close(col.file)
     end
-    for blk in col.blocks
-        close(blk)
-    end
-    col.isopen = false
-    close(col.root)
-    close(col.file)
     return nothing
 end
 

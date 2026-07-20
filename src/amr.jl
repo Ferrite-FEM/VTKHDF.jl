@@ -82,6 +82,7 @@ function add_box(
     )
     vtk = lvl.vtk::VTKHDFFile{AMRState}
     vtk.isopen || error("file is closed")
+    vtk.failed && error("a previous write to this file failed; the file is incomplete")
     (imin, imax, jmin, jmax, kmin, kmax) = Int64.(extents)
     (imax >= imin && jmax >= jmin && kmax >= kmin) ||
         throw(ArgumentError("invalid AMR box extents $extents"))
@@ -92,32 +93,42 @@ function add_box(
         check_name(String(name))
         n = tuple_count(data)
         n == npoints || error("box point data $name has $n tuples, expected $npoints")
+        prepare_tuples(data)
     end
     for (name, data) in celldata
         check_name(String(name))
         n = tuple_count(data)
         n == ncells || error("box cell data $name has $n tuples, expected $ncells")
-    end
-    append_rows(
-        appendable(vtk, lvl.group, "AMRBox", Int64, (6,)),
-        reshape(Int64[imin, imax, jmin, jmax, kmin, kmax], 6, 1)
-    )
-    lvl.total_points += npoints
-    lvl.total_cells += ncells
-    for (name, data) in pointdata
-        level_append_data!(lvl, "PointData", String(name), data)
-    end
-    for (name, data) in celldata
-        level_append_data!(lvl, "CellData", String(name), data)
+        prepare_tuples(data)
     end
     for (name, data) in fielddata
-        level_append_data!(lvl, "FieldData", String(name), data)
+        check_name(String(name))
+        prepare_tuples(data)
+    end
+    mutating(vtk) do
+        append_rows(
+            appendable(vtk, lvl.group, "AMRBox", Int64, (6,)),
+            reshape(Int64[imin, imax, jmin, jmax, kmin, kmax], 6, 1)
+        )
+        lvl.total_points += npoints
+        lvl.total_cells += ncells
+        for (name, data) in pointdata
+            level_append_data!(lvl, "PointData", String(name), data)
+        end
+        for (name, data) in celldata
+            level_append_data!(lvl, "CellData", String(name), data)
+        end
+        for (name, data) in fielddata
+            level_append_data!(lvl, "FieldData", String(name), data)
+        end
     end
     return lvl
 end
 
 function level_append_data!(lvl::AMRLevel, groupname::String, name::AbstractString, data)
     vtk = lvl.vtk::VTKHDFFile{AMRState}
+    vtk.isopen || error("file is closed")
+    vtk.failed && error("a previous write to this file failed; the file is incomplete")
     check_name(name)
     ncomp, n, arr = prepare_tuples(data)
     grp = get_or_create_group(lvl.group, groupname)
