@@ -1,5 +1,12 @@
 # Table writer (spec 2.8): NumberOfRows (one entry per step) + RowData columns.
 
+"""
+    VTKRowData()
+
+The data location of Table columns, usable wherever `VTKPointData()` etc.
+are: `tbl["a", VTKRowData()] = col` when writing, `r["a", VTKRowData()]` and
+`keys(r, VTKRowData())` when reading.
+"""
 struct VTKRowData <: VTKBase.AbstractFieldData end
 location_group(::VTKRowData) = "RowData"
 

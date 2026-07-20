@@ -9,10 +9,10 @@ if !RUN_JET
     @info "Skipping JET analysis on Julia $VERSION"
 else
     using JET
-    using WriteVTKHDF
+    using VTKHDF
 
     @testset "JET.jl" begin
-        JET.test_package(WriteVTKHDF; target_modules = (WriteVTKHDF,), toplevel_logger = nothing)
+        JET.test_package(VTKHDF; target_modules = (VTKHDF,), toplevel_logger = nothing)
     end
 
     @testset "JET entry points" begin
@@ -20,9 +20,27 @@ else
         cells = [MeshCell(VTKCellTypes.VTK_HEXAHEDRON, 1:8)]
         JET.test_call(
             vtkhdf_grid, (String, Matrix{Float64}, Vector{eltype(cells)});
-            target_modules = (WriteVTKHDF,)
+            target_modules = (VTKHDF,)
         )
-        JET.test_call(vtkhdf_table, (String,); target_modules = (WriteVTKHDF,))
-        JET.test_call(vtkhdf_collection, (String,); target_modules = (WriteVTKHDF,))
+        JET.test_call(vtkhdf_table, (String,); target_modules = (VTKHDF,))
+        JET.test_call(vtkhdf_collection, (String,); target_modules = (VTKHDF,))
+    end
+
+    @testset "JET reader entry points" begin
+        UGReader = VTKHDF.VTKHDFReader{VTKHDF.ReadUnstructured}
+        JET.test_call(vtkhdf_open, (String,); target_modules = (VTKHDF,))
+        JET.test_call(getindex, (UGReader, String); target_modules = (VTKHDF,))
+        JET.test_call(read_timestep, (UGReader, Int); target_modules = (VTKHDF,))
+        JET.test_call(read_points, (UGReader,); target_modules = (VTKHDF,))
+        JET.test_call(read_cells, (UGReader,); target_modules = (VTKHDF,))
+        JET.test_call(
+            read_coordinates, (VTKHDF.VTKHDFReader{VTKHDF.ReadRectilinear},);
+            target_modules = (VTKHDF,)
+        )
+        JET.test_call(
+            getindex, (VTKHDF.VTKHDFCollectionReader, String);
+            target_modules = (VTKHDF,)
+        )
+        JET.test_call(close, (UGReader,); target_modules = (VTKHDF,))
     end
 end

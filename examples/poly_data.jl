@@ -10,7 +10,7 @@
 # ![Warped torus colored by material](../assets/examples/poly_data-light.png)
 # ![Warped torus colored by material](../assets/examples/poly_data-dark.png)
 
-using WriteVTKHDF
+using VTKHDF
 
 nu, nv = 48, 24
 R, r = 1.0f0, 0.4f0
@@ -35,10 +35,30 @@ quads = vec(
             for iu in 0:(nu - 1), iv in 0:(nv - 1)
     ]
 )
-materials = vec([iu < nu ÷ 2 ? 1 : 2 for iu in 0:(nu - 1), iv in 0:(nv - 1)])
+materials = vec([iu < nu ÷ 2 ? 1 : 2 for iu in 0:(nu - 1), iv in 0:(nv - 1)]);
 
 vtkhdf_grid("torus", points, quads) do vtk
     vtk["Normals", VTKPointData(), attribute = :Normals] = normals
     vtk["Warping", VTKPointData(), attribute = :Vectors] = warping
     vtk["Materials", VTKCellData()] = materials
 end
+nothing #hide
+
+# ## Reading it back
+#
+# PolyData cells come back grouped by category:
+
+r_torus = vtkhdf_open("torus")
+map(length, read_cells(r_torus))
+
+# Data arrays and active-attribute marks round-trip:
+
+r_torus["Materials", VTKCellData()] == materials
+
+#-
+
+VTKHDF.active_attributes(r_torus, VTKPointData())
+
+#-
+
+close(r_torus)

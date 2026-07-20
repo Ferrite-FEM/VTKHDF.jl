@@ -1,7 +1,7 @@
 using Aqua
 using Test
-using WriteVTKHDF
+using VTKHDF
 
 @testset "Aqua.jl" begin
-    Aqua.test_all(WriteVTKHDF)
+    Aqua.test_all(VTKHDF)
 end

@@ -10,7 +10,7 @@
 # ![Partitioned hexahedra mesh colored by EQPS](../assets/examples/unstructured_grid-light.png)
 # ![Partitioned hexahedra mesh colored by EQPS](../assets/examples/unstructured_grid-dark.png)
 
-using WriteVTKHDF
+using VTKHDF
 
 # A block of `n³` hexahedra filling a unit cube at `origin`:
 
@@ -31,6 +31,7 @@ function hex_block(origin; n = 3)
     )
     return points, cells
 end
+nothing #hide
 
 # Creating the file with the `VTKUnstructuredGrid()` tag defers the geometry;
 # partitions are then appended one by one together with their data.
@@ -47,3 +48,28 @@ for (rank, origin) in enumerate(((0, 0, 0), (1, 0, 0), (2, 0, 0)))
 end
 vtk["TimeValue", VTKFieldData()] = [0.001]
 close(vtk)
+
+# ## Reading it back
+#
+# The same file can be opened again with [`vtkhdf_open`](@ref):
+
+r_can = vtkhdf_open("can")
+
+# Geometry comes back through [`read_points`](@ref)/[`read_cells`](@ref),
+# with the partitions concatenated and cell connectivity rebased to global
+# point ids, so the cells index directly into the returned points:
+
+size(read_points(r_can)), length(read_cells(r_can))
+
+# Data arrays use the same indexing syntax as writing, and the partition
+# structure is recoverable as index ranges into them:
+
+extrema(r_can["EQPS", VTKCellData()])
+
+#-
+
+VTKHDF.partition_ranges(r_can).cells
+
+#-
+
+close(r_can)

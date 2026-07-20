@@ -12,21 +12,21 @@
 # ![Collection blocks: cube and square](../assets/examples/partitioned_collection-light.png)
 # ![Collection blocks: cube and square](../assets/examples/partitioned_collection-dark.png)
 
-using WriteVTKHDF
+using VTKHDF
 
 square = Float32[
     0 1 1 0
     0 0 1 1
     0 0 0 0
 ]
-quad = [MeshCell(PolyData.Polys(), [1, 2, 3, 4])]
+quad = [MeshCell(PolyData.Polys(), [1, 2, 3, 4])];
 
 cube = Float64[
     0 1 1 0 0 1 1 0
     0 0 1 1 0 0 1 1
     0 0 0 0 1 1 1 1
 ]
-hex = [MeshCell(VTKCellTypes.VTK_HEXAHEDRON, 1:8)]
+hex = [MeshCell(VTKCellTypes.VTK_HEXAHEDRON, 1:8)];
 
 vtkhdf_collection("composite") do col
     surface = vtkhdf_grid(col, "Surface", square, quad)
@@ -41,3 +41,25 @@ vtkhdf_collection("composite") do col
     add_block_ref(both, surface)
     add_block_ref(both, solid)
 end
+nothing #hide
+
+# ## Reading it back
+#
+# Blocks of a composite file are readers themselves:
+
+col = vtkhdf_open("composite")
+keys(col)
+
+#-
+
+col["Solid"]["Temperature"]
+
+# The assembly hierarchy comes back as a tree of node names and block
+# references:
+
+asm = VTKHDF.read_assembly(col)
+[(n.name, n.blocks) for n in asm.children]
+
+#-
+
+close(col)

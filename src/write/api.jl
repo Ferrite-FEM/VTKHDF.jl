@@ -20,9 +20,13 @@ dataset as a block of a composite file (see [`vtkhdf_collection`](@ref)).
     vtkhdf_grid(filename, x, [y, [z]]; kwargs...)
     vtkhdf_grid(filename, xyz::AbstractArray{T,4}; kwargs...)
     vtkhdf_grid(dataset_type, filename, args...; kwargs...)
+    vtkhdf_grid(dataset_type, filename; kwargs...)
 
 Create a VTKHDF file for one of the grid dataset types. The type is inferred
-from the arguments (mirroring WriteVTK.jl):
+from the arguments (mirroring WriteVTK.jl). The last form — just a
+`VTKUnstructuredGrid()`/`VTKPolyData()` tag and no geometry — creates the
+file empty, so partitions can be appended one at a time with
+[`add_partition`](@ref):
 
 - **UnstructuredGrid**: `points` (a `3×N` matrix — smaller first dimensions
   are zero-padded — a vector of point-like objects, or a tuple of coordinate
