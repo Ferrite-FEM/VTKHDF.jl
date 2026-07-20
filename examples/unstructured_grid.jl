@@ -1,0 +1,45 @@
+# # UnstructuredGrid: partitioned mesh
+#
+# Port of the `can-pvtu.vtkhdf` example from the VTKHDF specification: an
+# UnstructuredGrid written as three partitions (as a three-rank MPI
+# simulation would produce), each carrying point and cell data, plus a
+# global FieldData array. All partitions land in one file; VTK reads them
+# back as a partitioned dataset.
+
+using WriteVTKHDF
+
+# A block of `n³` hexahedra filling a unit cube at `origin`:
+
+function hex_block(origin; n = 3)
+    corners = vec(collect(Iterators.product(0:n, 0:n, 0:n)))
+    points = [origin[d] + c[d] / n for d in 1:3, c in corners]
+    id(i, j, k) = i + 1 + (n + 1) * (j + (n + 1) * k)
+    cells = vec(
+        [
+            MeshCell(
+                    VTKCellTypes.VTK_HEXAHEDRON, [
+                        id(i, j, k), id(i + 1, j, k), id(i + 1, j + 1, k), id(i, j + 1, k),
+                        id(i, j, k + 1), id(i + 1, j, k + 1), id(i + 1, j + 1, k + 1), id(i, j + 1, k + 1),
+                    ]
+                )
+                for i in 0:(n - 1), j in 0:(n - 1), k in 0:(n - 1)
+        ]
+    )
+    return points, cells
+end
+
+# Creating the file with the `VTKUnstructuredGrid()` tag defers the geometry;
+# partitions are then appended one by one together with their data.
+
+vtk = vtkhdf_grid(VTKUnstructuredGrid(), "can")
+for (rank, origin) in enumerate(((0, 0, 0), (1, 0, 0), (2, 0, 0)))
+    points, cells = hex_block(origin)
+    velocity = points .- [1.5, 0.5, 0.5]
+    add_partition(
+        vtk, points, cells;
+        pointdata = ("VEL" => velocity,),
+        celldata = ("EQPS" => fill(0.1 * rank, length(cells)),),
+    )
+end
+vtk["TimeValue", VTKFieldData()] = [0.001]
+close(vtk)

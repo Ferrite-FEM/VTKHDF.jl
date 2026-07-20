@@ -7,6 +7,10 @@ extension when the filename has none. The grid, table and composite
 constructors also take `temporal = true` for time-dependent writing
 (OverlappingAMR and HyperTreeGrid are static-only).
 
+Complete runnable programs, ported from the reference files shown in the
+VTKHDF specification, are in the Examples section (and in the `examples/`
+folder of the repository).
+
 ## Data arrays
 
 Data is attached with index syntax:

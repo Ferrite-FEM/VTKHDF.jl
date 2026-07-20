@@ -38,7 +38,9 @@ vtkhdf_grid("output", points, cells) do vtk
 end
 ```
 
-See the [Manual](@ref manual) for all dataset types and temporal writing.
+See the [Manual](@ref manual) for all dataset types and temporal writing, and
+the Examples section for complete programs — one per reference file of the
+VTKHDF specification.
 
 ## Supported dataset types
 
