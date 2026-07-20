@@ -60,13 +60,13 @@ makedocs(
     ],
     format = Documenter.HTML(
         prettyurls = prettyurls,
-        canonical = "https://kristofferc.github.io/WriteVTKHDF.jl",
+        canonical = "https://ferrite-fem.github.io/WriteVTKHDF.jl",
         assets = ["assets/custom.css"],
     ),
     checkdocs = :exports,
 )
 
 deploydocs(
-    repo = "github.com/KristofferC/WriteVTKHDF.jl.git",
+    repo = "github.com/Ferrite-FEM/WriteVTKHDF.jl.git",
     push_preview = true,
 )

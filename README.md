@@ -1,7 +1,7 @@
 # WriteVTKHDF.jl
 
-[![CI](https://github.com/KristofferC/WriteVTKHDF.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/KristofferC/WriteVTKHDF.jl/actions/workflows/CI.yml)
-[![Documentation](https://img.shields.io/badge/docs-stable-blue.svg)](https://kristofferc.github.io/WriteVTKHDF.jl/dev/)
+[![CI](https://github.com/Ferrite-FEM/WriteVTKHDF.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/Ferrite-FEM/WriteVTKHDF.jl/actions/workflows/CI.yml)
+[![Documentation](https://img.shields.io/badge/docs-stable-blue.svg)](https://ferrite-fem.github.io/WriteVTKHDF.jl/dev/)
 
 Write VTK data in the [VTKHDF file format](https://docs.vtk.org/en/latest/vtk_file_formats/vtkhdf_file_format/index.html) —
 the HDF5-based successor to the VTK XML formats — readable by ParaView, VisIt
@@ -56,7 +56,7 @@ Plus gzip compression (`compress = true`), active attribute marking
 (`Scalars`/`Vectors`/...), and writing datasets as blocks of composite files.
 Files are validated against VTK's own `vtkHDFReader` in the test suite.
 
-See the [documentation](https://kristofferc.github.io/WriteVTKHDF.jl/dev/) for
+See the [documentation](https://ferrite-fem.github.io/WriteVTKHDF.jl/dev/) for
 the full manual.
 
 ## Development

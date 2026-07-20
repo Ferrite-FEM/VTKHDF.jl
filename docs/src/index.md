@@ -21,7 +21,7 @@ cell/data types through [VTKBase.jl](https://github.com/JuliaVTK/VTKBase.jl).
 ## Installation
 
 ```julia
-pkg> add https://github.com/KristofferC/WriteVTKHDF.jl
+pkg> add https://github.com/Ferrite-FEM/WriteVTKHDF.jl
 ```
 
 ## Quick start
