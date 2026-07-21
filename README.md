@@ -3,19 +3,18 @@
 [![CI](https://github.com/Ferrite-FEM/VTKHDF.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/Ferrite-FEM/VTKHDF.jl/actions/workflows/CI.yml)
 [![Documentation](https://img.shields.io/badge/docs-dev-blue.svg)](https://ferrite-fem.github.io/VTKHDF.jl/dev/)
 
-Write and read VTK data in the [VTKHDF file format](https://docs.vtk.org/en/latest/vtk_file_formats/vtkhdf_file_format/index.html) —
-the HDF5-based successor to the VTK XML formats — readable by ParaView, VisIt
-and VTK. The writing side is a VTKHDF sibling of
-[WriteVTK.jl](https://github.com/JuliaVTK/WriteVTK.jl), with a familiar API
-(cells and data locations are shared via
-[VTKBase.jl](https://github.com/JuliaVTK/VTKBase.jl)); `vtkhdf_open` reads
-the same files — and spec-conforming VTKHDF files from other writers — back
-into Julia.
+Write and read VTK data in the [VTKHDF file format](https://docs.vtk.org/en/latest/vtk_file_formats/vtkhdf_file_format/index.html),
+the HDF5-based successor to the VTK XML formats, readable by ParaView, VisIt
+and VTK. The writing API follows
+[WriteVTK.jl](https://github.com/JuliaVTK/WriteVTK.jl) and shares its cell and
+data-location types through
+[VTKBase.jl](https://github.com/JuliaVTK/VTKBase.jl). `vtkhdf_open` reads those
+files back into Julia, including spec-conforming VTKHDF files from other
+writers.
 
-The headline feature over the XML formats is native **time series support in a
-single file**: for a transient simulation on a fixed mesh the geometry is
-stored *once*, and each time step appends only its data arrays — no more
-`.pvd` collections with one `.vtu` file per step.
+Time series can live in a single file: for a transient simulation on a fixed
+mesh the geometry is stored once, and each time step appends only its data
+arrays, instead of a `.pvd` collection with one `.vtu` file per step.
 
 ```julia
 using VTKHDF

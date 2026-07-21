@@ -19,10 +19,10 @@ Write one time step with time value `t` to a temporal VTKHDF file. Data arrays
 are written inside the do-block with the same `vtk[name] = data` syntax used
 for static files.
 
-Without geometry keyword arguments the geometry of the previous step is reused
-(and stored only once in the file). Passing new geometry (e.g. `points`/`cells`
-for unstructured grids, `x`/`y`/`z` for rectilinear grids, `points` for
-structured grids) appends it and makes this and following steps use it.
+With no geometry keyword arguments, the previous step's geometry is reused and
+stored only once. Passing new geometry (`points`/`cells` for unstructured
+grids, `x`/`y`/`z` for rectilinear grids, `points` for structured grids)
+appends it; this step and later ones then use it.
 
 The set of data arrays (names, element types, component counts) must be the
 same for every step; it is fixed by the first step.
