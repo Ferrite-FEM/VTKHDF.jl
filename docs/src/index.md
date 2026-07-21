@@ -1,23 +1,22 @@
 # VTKHDF.jl
 
 Write and read VTK data in the
-[VTKHDF file format](https://docs.vtk.org/en/latest/vtk_file_formats/vtkhdf_file_format/index.html) —
-the HDF5-based successor to the VTK XML formats — readable by ParaView, VisIt
-and VTK. The writing API aims to feel familiar to
-[WriteVTK.jl](https://github.com/JuliaVTK/WriteVTK.jl) users and shares its
-cell/data types through [VTKBase.jl](https://github.com/JuliaVTK/VTKBase.jl);
-[`vtkhdf_open`](@ref) reads the same files (and spec-conforming files from
-other writers) back.
+[VTKHDF file format](https://docs.vtk.org/en/latest/vtk_file_formats/vtkhdf_file_format/index.html),
+the HDF5-based successor to the VTK XML formats, readable by ParaView, VisIt
+and VTK. The writing API follows
+[WriteVTK.jl](https://github.com/JuliaVTK/WriteVTK.jl) and shares its cell/data
+types through [VTKBase.jl](https://github.com/JuliaVTK/VTKBase.jl).
+[`vtkhdf_open`](@ref) reads those files back, including spec-conforming files
+from other writers.
 
 ## Why VTKHDF?
 
-- **One file per simulation, not per step.** VTKHDF has native time series
-  support: a temporal file holds all steps, and for a fixed mesh the geometry
-  is stored *once* while each step appends only its data. This replaces the
-  `.pvd` + one-`.vtu`-per-step workflow.
-- **HDF5 underneath**: standard tooling (`h5dump`, `h5py`, HDF5.jl) can
-  inspect files; chunked storage and gzip compression come for free.
-- **A single format for everything** from image data to composite
+- Time series live in one file. A temporal file holds all steps, and for a
+  fixed mesh the geometry is stored once while each step appends only its
+  data, replacing the `.pvd` + one-`.vtu`-per-step workflow.
+- It is built on HDF5, so standard tooling (`h5dump`, `h5py`, HDF5.jl) can
+  inspect the files, and chunked storage and gzip compression are available.
+- One format covers all the dataset types, from image data to composite
   multi-block datasets.
 
 ## Installation

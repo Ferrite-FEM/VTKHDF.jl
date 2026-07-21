@@ -30,12 +30,12 @@ end
     vtkhdf_collection(filename) -> collection
     vtkhdf_multiblock(filename) -> collection
 
-Create a composite VTKHDF file of type `PartitionedDataSetCollection`
-(respectively `MultiBlockDataSet`). Blocks are created with the usual
-constructors taking `(collection, name)` instead of a filename, e.g.
-`vtkhdf_grid(col, "mesh", points, cells)`, and behave like standalone files
-(including temporal writing; all temporal blocks must use the same time
-values). The block hierarchy is defined with [`add_node`](@ref) and
+Create a composite VTKHDF file: a `PartitionedDataSetCollection`, or a
+`MultiBlockDataSet` for `vtkhdf_multiblock`. Blocks are created with the usual
+constructors, passing `(collection, name)` instead of a filename, e.g.
+`vtkhdf_grid(col, "mesh", points, cells)`. They behave like standalone files,
+temporal writing included, except that all temporal blocks must share the same
+time values. The block hierarchy is defined with [`add_node`](@ref) and
 [`add_block_ref`](@ref); [`add_empty_block`](@ref) creates a type-less block.
 
 Supports the do-block form. Closing the collection closes all blocks.

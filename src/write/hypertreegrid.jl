@@ -11,11 +11,10 @@ end
 """
     vtkhdf_htg(filename; dimensions, branch_factor = 2, kwargs...)
 
-Create a VTKHDF `HyperTreeGrid` file. The grid of trees has `dimensions`
-(number of coordinate points per direction); the number of trees is the
-product of `max(nᵢ - 1, 1)` over the directions (degenerate directions with a
-single coordinate do not contribute). Pieces (partitions) are appended with
-[`add_piece`](@ref).
+Create a VTKHDF `HyperTreeGrid` file. `dimensions` is the number of coordinate
+points per direction. The number of trees is the product of `max(nᵢ - 1, 1)`
+over the directions, so a direction with a single coordinate contributes no
+trees. Pieces (partitions) are appended with [`add_piece`](@ref).
 
 Optional keywords: `transposed_root_indexing::Bool`,
 `interface_normals_name`, `interface_intercepts_name`.

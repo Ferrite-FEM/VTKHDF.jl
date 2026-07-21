@@ -3,7 +3,7 @@
 
 Write and read VTK data in the [VTKHDF file format](https://docs.vtk.org/en/latest/vtk_file_formats/vtkhdf_file_format/index.html)
 (HDF5-based, spec version 2.x). Supports static and temporal data for all
-basic VTK dataset types as well as composite datasets.
+basic VTK dataset types and composite datasets.
 
 Main entry points for writing: [`vtkhdf_grid`](@ref), [`vtkhdf_table`](@ref),
 [`vtkhdf_amr`](@ref), [`vtkhdf_htg`](@ref), [`vtkhdf_collection`](@ref),

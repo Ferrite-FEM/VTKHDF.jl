@@ -28,9 +28,10 @@ from the arguments (mirroring WriteVTK.jl). The last form — just a
 file empty, so partitions can be appended one at a time with
 [`add_partition`](@ref):
 
-- **UnstructuredGrid**: `points` (a `3×N` matrix — smaller first dimensions
-  are zero-padded — a vector of point-like objects, or a tuple of coordinate
-  vectors) and `cells`, a vector of `MeshCell`/`VTKPolyhedron`.
+- **UnstructuredGrid**: `points` and `cells`. `points` is a `3×N` matrix
+  (smaller first dimensions are zero-padded), a vector of point-like objects,
+  or a tuple of coordinate vectors; `cells` is a vector of
+  `MeshCell`/`VTKPolyhedron`.
 - **PolyData**: `points` plus one or more vectors of `MeshCell`s with
   `PolyData.*` cell types (e.g. `PolyData.Polys()`); each vector must contain
   a single category. On disk (and for cell data) cells are ordered Vertices,
@@ -43,11 +44,11 @@ file empty, so partitions can be appended one at a time with
 - **StructuredGrid**: a `(3, ni, nj, nk)` coordinate array, or three
   `(ni, nj, nk)` arrays `x, y, z`.
 
-Data arrays are then written with `vtk["name"] = data` (the location is
-inferred from the size, or passed explicitly:
-`vtk["name", VTKCellData()] = data`). Vector/tensor data uses the component-
-first convention (`(3, N)` for vectors, like WriteVTK.jl), or a vector of
-static vectors / tuples. The `attribute` keyword marks active attributes:
+Data arrays are written with `vtk["name"] = data`; the location is inferred
+from the size, or given explicitly as `vtk["name", VTKCellData()] = data`.
+Vector and tensor data uses the component-first convention (`(3, N)` for
+vectors, like WriteVTK.jl), or a vector of static vectors or tuples. The
+`attribute` keyword marks active attributes:
 `vtk["u", VTKPointData(), attribute = :Vectors] = u`.
 
 $GRID_KWARGS_DOC
