@@ -196,6 +196,12 @@ function Base.close(col::VTKHDFCollection)
     return nothing
 end
 
+function Base.flush(col::VTKHDFCollection)
+    col.isopen || return nothing
+    flush(col.file)
+    return nothing
+end
+
 function Base.show(io::IO, col::VTKHDFCollection)
     return print(
         io, "VTKHDFCollection (", col.multiblock ? "MultiBlockDataSet" : "PartitionedDataSetCollection",
