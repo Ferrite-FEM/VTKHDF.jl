@@ -82,6 +82,13 @@ function Base.close(vtk::VTKHDFFile)
     return nothing
 end
 
+function Base.flush(vtk::VTKHDFFile)
+    vtk.isopen || return nothing
+    file = vtk.file
+    file === nothing || flush(file)  # nothing for composite blocks (collection owns the handle)
+    return nothing
+end
+
 finalize_kind!(vtk, kind::DatasetKind) = nothing
 
 function Base.show(io::IO, vtk::VTKHDFFile)
