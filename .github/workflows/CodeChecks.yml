@@ -23,7 +23,7 @@ jobs:
       - uses: julia-actions/setup-julia@v2
         with:
           version: '1'
-      - uses: julia-actions/cache@v2
+      - uses: julia-actions/cache@v3
       - uses: fredrikekre/runic-action@v1
         with:
           version: '1.7'
@@ -38,7 +38,7 @@ jobs:
       - uses: julia-actions/setup-julia@v2
         with:
           version: '1'
-      - uses: julia-actions/cache@v2
+      - uses: julia-actions/cache@v3
       - name: JET tests
         shell: julia --color=yes --project=@jet {0}
         run: |
@@ -55,7 +55,7 @@ jobs:
       - uses: julia-actions/setup-julia@v2
         with:
           version: '1'
-      - uses: julia-actions/cache@v2
+      - uses: julia-actions/cache@v3
       - name: Aqua tests
         shell: julia --color=yes --project=@aqua {0}
         run: |
@@ -72,7 +72,7 @@ jobs:
       - uses: julia-actions/setup-julia@v2
         with:
           version: '1'
-      - uses: julia-actions/cache@v2
+      - uses: julia-actions/cache@v3
       - name: ExplicitImports tests
         shell: julia --color=yes --project=@explicit-imports {0}
         run: |
