@@ -36,7 +36,7 @@ jobs:
       - uses: julia-actions/cache@v2
       # Python VTK provides vtkHDFReader for the round-trip validation tests
       # (they are skipped when unavailable); h5dump backs the raw-layout tests.
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - name: Install VTK (round-trip validation)
