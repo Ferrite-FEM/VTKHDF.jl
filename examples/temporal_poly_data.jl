@@ -5,8 +5,13 @@
 # time step at a time. The geometry is stored exactly once; each step
 # appends only its data arrays, together with per-step read offsets under
 # `/VTKHDF/Steps`. (Passing `points`/`cells` to `write_timestep` would
-# append updated geometry instead of reusing it.) The step at `t = 0.3` in
-# ParaView, warped by `displacement` and colored by `height`:
+# append updated geometry instead of reusing it.)
+#
+# **What you'll learn:** how to append time steps with fixed geometry and how
+# to read each step through a timestep view.
+#
+# The step at `t = 0.3` in ParaView, warped by `displacement` and colored by
+# `height`:
 #
 # ![Travelling wave at t = 0.3](../assets/examples/temporal_poly_data-light.png)
 # ![Travelling wave at t = 0.3](../assets/examples/temporal_poly_data-dark.png)
@@ -32,8 +37,8 @@ height(t) = [0.15 * sinpi(2 * (x - t)) * sinpi(y) for (x, y) in eachcol(points[1
 nothing #hide
 
 vtk = vtkhdf_grid("wave", points, quads; temporal = true)
-for step in 0:9
-    t = step / 10
+for step_index in 0:9
+    t = step_index / 10
     h = height(t)
     write_timestep(vtk, t) do frame
         frame["height"] = h
@@ -52,18 +57,18 @@ r = vtkhdf_open("wave")
 
 #-
 
-step = read_timestep(r, 5)
+frame = read_timestep(r, 5)
 
 # Each step supports the same accessors as a static file; the data of step 5
 # is exactly what was written for `t = 0.4`:
 
-step["height"] ≈ height(VTKHDF.time_value(step))
+frame["height"] ≈ height(VTKHDF.time_value(frame))
 
 # The file stores a single copy of the unchanged geometry, and
 # `read_points(step)` resolves any step's per-step offsets to it — the
 # caller never needs to know which steps wrote geometry and which reused it:
 
-size(read_points(step)), length(read_cells(step).polygons)
+size(read_points(frame)), length(read_cells(frame).polygons)
 
 #-
 

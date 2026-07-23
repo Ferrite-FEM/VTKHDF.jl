@@ -22,25 +22,32 @@ from other writers.
 ## Installation
 
 ```julia
-pkg> add https://github.com/Ferrite-FEM/VTKHDF.jl
+import Pkg
+Pkg.add(url = "https://github.com/Ferrite-FEM/VTKHDF.jl")
 ```
 
 ## Quick start
 
-```julia
+```@example quickstart
 using VTKHDF
 
-points = rand(3, 100)
+points = [
+    0.0 1.0 0.0 0.0
+    0.0 0.0 1.0 0.0
+    0.0 0.0 0.0 1.0
+]
 cells = [MeshCell(VTKCellTypes.VTK_TETRA, [1, 2, 3, 4])]
 
 vtkhdf_grid("output", points, cells) do vtk
-    vtk["temperature"] = rand(100)                  # point data (auto-detected)
+    vtk["temperature"] = [0.0, 1.0, 1.0, 1.0]      # one value per point
     vtk["material", VTKCellData()] = [1]
 end
 
 vtkhdf_open("output") do r                          # read it back
     r["temperature"], read_points(r), read_cells(r)
 end
+rm("output.vtkhdf") #hide
+nothing #hide
 ```
 
 See the [Manual](@ref manual) for all dataset types, temporal writing and the

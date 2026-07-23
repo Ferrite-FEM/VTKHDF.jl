@@ -6,6 +6,10 @@
 # span the complex c-plane and the z axis varies the real part of the
 # starting value, so every slice is a different member of the Mandelbrot
 # family. Coordinate ranges define the uniform grid (origin and spacing).
+#
+# **What you'll learn:** how coordinate ranges define ImageData, how scalar
+# and vector arrays follow the grid shape, and how to mark active attributes.
+#
 # `Iterations` volume-rendered in ParaView:
 #
 # ![Volume rendering of the Mandelbrot iteration count](../assets/examples/image_data-light.png)

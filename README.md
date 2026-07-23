@@ -19,28 +19,33 @@ arrays, instead of a `.pvd` collection with one `.vtu` file per step.
 ```julia
 using VTKHDF
 
-points = rand(3, 100)                       # or vectors of SVector/tuples
-cells = [MeshCell(VTKCellTypes.VTK_TETRA, [1, 2, 3, 4]), ...]
+points = [                 # unit cube; vectors of SVector/tuples also work
+    0.0 1.0 1.0 0.0 0.0 1.0 1.0 0.0
+    0.0 0.0 1.0 1.0 0.0 0.0 1.0 1.0
+    0.0 0.0 0.0 0.0 1.0 1.0 1.0 1.0
+]
+cells = [MeshCell(VTKCellTypes.VTK_HEXAHEDRON, 1:8)]
 
 # static file
 vtkhdf_grid("output", points, cells) do vtk
-    vtk["temperature"] = T                   # point data (auto-detected)
-    vtk["material", VTKCellData()] = mat
-    vtk["velocity", VTKPointData(), attribute = :Vectors] = v  # (3, N)
+    vtk["height"] = points[3, :]             # point data (auto-detected)
+    vtk["material", VTKCellData()] = [1]
+    vtk["position", VTKPointData(), attribute = :Vectors] = points
 end
 
 # temporal file — geometry written once, data appended per step
+timesteps = 0.0:0.1:1.0
 vtk = vtkhdf_grid("simulation", points, cells; temporal = true)
-for (t, u) in timesteps
+for t in timesteps
     write_timestep(vtk, t) do frame
-        frame["u"] = u
+        frame["u"] = fill(t, 8)
     end
 end
 close(vtk)
 
 # reading files back
 vtkhdf_open("output") do r
-    T = r["temperature"]                     # same indexing as writing
+    height = r["height"]                      # same indexing as writing
     points, cells = read_points(r), read_cells(r)
 end
 vtkhdf_open("simulation") do r

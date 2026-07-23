@@ -7,6 +7,9 @@
 # back as a partitioned dataset. The three partitions colored by `EQPS`, with
 # a few `VEL` arrow glyphs:
 #
+# **What you'll learn:** how to append partitions with local geometry and
+# data, then recover their global ranges when reading.
+#
 # ![Partitioned hexahedra mesh colored by EQPS](../assets/examples/unstructured_grid-light.png)
 # ![Partitioned hexahedra mesh colored by EQPS](../assets/examples/unstructured_grid-dark.png)
 
@@ -37,13 +40,13 @@ nothing #hide
 # partitions are then appended one by one together with their data.
 
 vtk = vtkhdf_grid(VTKUnstructuredGrid(), "can")
-for (rank, origin) in enumerate(((0, 0, 0), (1, 0, 0), (2, 0, 0)))
+for (partition_id, origin) in enumerate(((0, 0, 0), (1, 0, 0), (2, 0, 0)))
     points, cells = hex_block(origin)
     velocity = points .- [1.5, 0.5, 0.5]
     add_partition(
         vtk, points, cells;
         pointdata = ("VEL" => velocity,),
-        celldata = ("EQPS" => fill(0.1 * rank, length(cells)),),
+        celldata = ("EQPS" => fill(0.1 * partition_id, length(cells)),),
     )
 end
 vtk["TimeValue", VTKFieldData()] = [0.001]
@@ -59,16 +62,23 @@ r_can = vtkhdf_open("can")
 # with the partitions concatenated and cell connectivity rebased to global
 # point ids, so the cells index directly into the returned points:
 
-size(read_points(r_can)), length(read_cells(r_can))
+# Each partition contributes `4³ = 64` points and `3³ = 27` cells, so the
+# combined reader exposes 192 points and 81 cells:
+
+size(read_points(r_can)), length(read_cells(r_can)) # ((3, 192), 81)
 
 # Data arrays use the same indexing syntax as writing, and the partition
 # structure is recoverable as index ranges into them:
 
-extrema(r_can["EQPS", VTKCellData()])
+# The three constant partition values span 0.1 through 0.3:
+
+extrema(r_can["EQPS", VTKCellData()]) # (0.1, 0.3)
 
 #-
 
-VTKHDF.partition_ranges(r_can).cells
+# These ranges show which 27-cell slice came from each partition:
+
+VTKHDF.partition_ranges(r_can).cells # [1:27, 28:54, 55:81]
 
 #-
 
