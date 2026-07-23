@@ -346,6 +346,15 @@ function resolve_read_location(r::VTKHDFReader, name::AbstractString)
     return hits[1]
 end
 
+"""
+    r["name"]
+    r["name", loc]
+
+Read a data array by name from a reader or a time step. Without a location
+the dataset's locations are searched (an ambiguous name throws); `loc`
+reads from that location only. Values come back as plain arrays in the
+writing shape convention (see [Data arrays](@ref data-arrays)).
+"""
 function Base.getindex(r::VTKHDFReader, name::AbstractString)
     check_open(r)
     return r[name, resolve_read_location(r, name)]

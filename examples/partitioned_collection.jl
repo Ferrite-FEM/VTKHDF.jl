@@ -3,16 +3,16 @@
 # Port of the `composite.hdf` example from the VTKHDF specification: a
 # collection holding a PolyData block and an UnstructuredGrid block, plus an
 # Assembly hierarchy grouping them. Blocks are written with the same API as
-# standalone files; assembly references are HDF5 soft links, and a block may
-# appear under several nodes. `vtkhdf_multiblock` writes a
-# MultiBlockDataSet the same way. The two blocks in ParaView — `Solid`
-# colored by `Temperature`, with the `Surface` square moved aside (it
-# coincides with a face of the cube). The translation is a ParaView display
-# transform used only for the screenshot; the file keeps the square on the
-# cube face.
+# standalone files. Assembly references are HDF5 soft links, so a block may
+# appear under several nodes. `vtkhdf_multiblock` writes a MultiBlockDataSet
+# the same way.
 #
 # **What you'll learn:** how to create named blocks, organize block references
 # in an assembly tree, and read both structures back.
+#
+# The two blocks in ParaView: `Solid` colored by `Temperature`, and the
+# `Surface` square moved aside. In the file the square sits on a face of the
+# cube; the translation is a display transform, made only for the screenshot.
 #
 # ![Collection blocks: cube and square](../assets/examples/partitioned_collection-light.png)
 # ![Collection blocks: cube and square](../assets/examples/partitioned_collection-dark.png)

@@ -3,9 +3,9 @@
 # Port of the `mandelbrot-vti.hdf` example from the
 # [VTKHDF specification](https://docs.vtk.org/en/latest/vtk_file_formats/vtkhdf_file_format/index.html):
 # an ImageData volume sampling the Mandelbrot iteration count. The x/y axes
-# span the complex c-plane and the z axis varies the real part of the
-# starting value, so every slice is a different member of the Mandelbrot
-# family. Coordinate ranges define the uniform grid (origin and spacing).
+# span the complex c-plane. The z axis varies the real part of the starting
+# value, so every slice is a different member of the Mandelbrot family.
+# Coordinate ranges define the uniform grid (origin and spacing).
 #
 # **What you'll learn:** how coordinate ranges define ImageData, how scalar
 # and vector arrays follow the grid shape, and how to mark active attributes.
@@ -61,18 +61,18 @@ nothing #hide
 #
 # The grid metadata comes back through `grid_info`:
 
-r_mandel = vtkhdf_open("mandelbrot")
-VTKHDF.grid_info(r_mandel)
+r = vtkhdf_open("mandelbrot")
+VTKHDF.grid_info(r)
 
-# Arrays are read by indexing (image-like data keeps its full 3-D shape),
-# and the marked active attributes are queryable:
+# Arrays are read by indexing; image-like data keeps its full 3-D shape.
+# The marked active attributes can be queried:
 
-size(r_mandel["Iterations"]), size(r_mandel["IterationsGradient"])
-
-#-
-
-VTKHDF.active_attributes(r_mandel, VTKPointData())
+size(r["Iterations"]), size(r["IterationsGradient"])
 
 #-
 
-close(r_mandel)
+VTKHDF.active_attributes(r, VTKPointData())
+
+#-
+
+close(r)
