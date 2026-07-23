@@ -1,6 +1,6 @@
 name = "VTKHDF"
 uuid = "45d8cf6f-ab5f-45bc-ab92-77e36ab192e6"
-version = "0.1.0"
+version = "1.0.0"
 authors = ["Kristoffer Carlsson <kcarlsson89@gmail.com>"]
 
 [deps]
