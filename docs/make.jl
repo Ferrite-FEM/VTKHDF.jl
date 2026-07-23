@@ -31,6 +31,7 @@ example_title(ex) = strip(chopprefix(readline(joinpath(@__DIR__, "..", "examples
 open(joinpath(@__DIR__, "src", "examples", "overview.md"), "w") do io
     println(io, "# Examples\n")
     println(io, "One example per reference file shown in the VTKHDF specification, ported to this package. Click an example to see the code that writes (and reads back) the file.\n")
+    println(io, "These examples focus on complete, visualization-ready datasets. If this is your first VTKHDF file, start with the [Manual](@ref manual) for the smaller geometry and data-array examples, then return here for the dataset type you need.\n")
     println(io, "```@raw html")
     println(io, "<div class=\"example-gallery\">")
     for ex in EXAMPLES

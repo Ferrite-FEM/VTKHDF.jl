@@ -4,8 +4,12 @@
 # a closed polygonal surface with `Normals` and `Warping` point vectors and
 # a `Materials` cell array. PolyData files always store the four cell
 # categories Vertices, Lines, Polygons and Strips (in that order, which is
-# also the cell-data order); only Polygons is populated here. The surface
-# warped by `Warping` and colored by `Materials` in ParaView:
+# also the cell-data order); only Polygons is populated here.
+#
+# **What you'll learn:** how to build polygon connectivity, attach point
+# vectors and cell scalars, and inspect PolyData's cell categories.
+#
+# The surface warped by `Warping` and colored by `Materials` in ParaView:
 #
 # ![Warped torus colored by material](../assets/examples/poly_data-light.png)
 # ![Warped torus colored by material](../assets/examples/poly_data-dark.png)

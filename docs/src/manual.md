@@ -10,6 +10,30 @@ Complete runnable programs, ported from the reference files shown in the
 VTKHDF specification, are in the [Examples](@ref) section (and in the
 `examples/` folder of the repository).
 
+```@setup manual
+using VTKHDF
+```
+
+## A grid in two parts
+
+An unstructured grid consists of point coordinates and cells that connect
+those points. Each column of `points` is one 3D point; the integers in a
+`MeshCell` are 1-based column indices:
+
+```@example manual
+points = [
+    0.0 1.0 0.0 0.0
+    0.0 0.0 1.0 0.0
+    0.0 0.0 0.0 1.0
+]
+cells = [MeshCell(VTKCellTypes.VTK_TETRA, [1, 2, 3, 4])]
+nothing #hide
+```
+
+Here four points form one tetrahedral cell. Other dataset types describe
+their geometry differently, but use the same distinction between values
+attached to points and values attached to cells.
+
 ## [Data arrays](@id data-arrays)
 
 Every data array is attached to one of a dataset's data groups, identified
@@ -20,14 +44,19 @@ additionally be marked as an *active attribute* (`:Scalars`, `:Vectors`,
 ...) — the array ParaView/VTK picks by default for coloring, glyphs etc.
 Writing and reading use the same indexing:
 
-```julia
-vtk["name"] = data                       # write; location inferred from the size
-vtk["name", VTKCellData()] = data        # write with explicit location
-vtk["v", VTKPointData(), attribute = :Vectors] = v   # mark active attribute
+```@example manual
+vtkhdf_grid("arrays", points, cells) do vtk
+    vtk["height"] = points[3, :]          # four values: inferred as point data
+    vtk["material", VTKCellData()] = [1]  # write with explicit location
+    vtk["position", VTKPointData(), attribute = :Vectors] = points
+end
 
-r["name"]                                # read; location found by name
-r["name", VTKCellData()]                 # read from an explicit location
-keys(r, VTKPointData())                  # array names at a location
+vtkhdf_open("arrays") do r
+    r["height"]                           # read; location found by name
+    r["material", VTKCellData()]          # read from an explicit location
+    keys(r, VTKPointData())               # array names at a location
+end
+nothing #hide
 ```
 
 Accepted array shapes when writing follow WriteVTK.jl's component-first
@@ -64,29 +93,35 @@ options are passed per block instead.
 
 ### Unstructured grids
 
-```julia
-points = rand(3, 8)        # 3×N matrix; N-vectors of point-like values also work
+```@example manual
+points = [                 # unit cube; 3×N matrix, or N-vectors of point-like values
+    0.0 1.0 1.0 0.0 0.0 1.0 1.0 0.0
+    0.0 0.0 1.0 1.0 0.0 0.0 1.0 1.0
+    0.0 0.0 0.0 0.0 1.0 1.0 1.0 1.0
+]
 cells = [
     MeshCell(VTKCellTypes.VTK_HEXAHEDRON, 1:8),
 ]
 vtkhdf_grid("mesh", points, cells) do vtk
-    vtk["u"] = rand(8)
+    vtk["height"] = points[3, :]
 end
+nothing #hide
 ```
 
 1‑ and 2‑dimensional points are zero-padded to 3 components. Polyhedra are
 written by putting [`VTKPolyhedron`](https://juliavtk.github.io/WriteVTK.jl/stable/grids/unstructured/#Polyhedron-cells)
 cells in the cell vector:
 
-```julia
+```@example manual
 cube = VTKPolyhedron(
     1:8,
     (1, 4, 3, 2), (1, 5, 8, 4), (5, 6, 7, 8),
     (6, 2, 3, 7), (1, 2, 6, 5), (3, 4, 8, 7),
 )
-vtkhdf_grid("poly", points, [cube]) do vtk
+vtkhdf_grid("poly", points, [cube]) do vtk   # same cube points as above
     vtk["u"] = rand(8)
 end
+nothing #hide
 ```
 
 #### Partitions
@@ -95,10 +130,14 @@ VTKHDF files can store multiple partitions (as produced by e.g. one MPI rank
 each). Creating the file with just the dataset tag defers the geometry;
 partitions are then appended explicitly, with their data:
 
-```julia
+```@example manual
+points1, points2 = rand(3, 4), rand(3, 4)
+cells1 = [MeshCell(VTKCellTypes.VTK_TETRA, 1:4)]
+cells2 = [MeshCell(VTKCellTypes.VTK_TETRA, 1:4)]
+
 vtk = vtkhdf_grid(VTKUnstructuredGrid(), "partitioned")   # no geometry yet
-add_partition(vtk, points₁, cells₁; pointdata = ("u" => u₁,))
-add_partition(vtk, points₂, cells₂; pointdata = ("u" => u₂,))
+add_partition(vtk, points1, cells1; pointdata = ("u" => rand(4),))
+add_partition(vtk, points2, cells2; pointdata = ("u" => rand(4),))
 close(vtk)
 ```
 
@@ -112,29 +151,45 @@ Cells use the `PolyData.*` cell types; pass one homogeneous vector per
 category. On disk the categories are ordered Vertices, Lines, Polygons,
 Strips — cell data must be supplied in that concatenated order.
 
-```julia
+```@example manual
+points = rand(3, 4)
 polys = [MeshCell(PolyData.Polys(), [1, 2, 3, 4])]
 lines = [MeshCell(PolyData.Lines(), [1, 3])]
 vtkhdf_grid("surface", points, polys, lines) do vtk
     vtk["height"] = rand(4)
 end
+nothing #hide
 ```
 
 ### Structured types
 
-```julia
-# ImageData: ranges define origin/spacing/extent
-vtkhdf_grid("image", 0:0.1:1, 0:0.1:2, 0:0.5:3) do vtk
+Choose ImageData for a uniformly spaced, axis-aligned grid; RectilinearGrid
+when spacing varies independently along each axis; and StructuredGrid when
+every point needs an explicit position, as in a curved grid.
+
+```@example manual
+# ImageData: ranges define a uniform origin, spacing, and extent
+vtkhdf_grid("image_ranges", 0:0.1:1, 0:0.1:2, 0:0.5:3) do vtk
     vtk["u"] = rand(11, 21, 7)
 end
-# ... or explicitly
-vtkhdf_grid(VTKImageData(), "image", (11, 21, 7); origin = (0, 0, 0), spacing = (0.1, 0.1, 0.5))
 
-# RectilinearGrid: coordinate vectors
-vtkhdf_grid("rect", [0.0, 1.0, 2.5], [0.0, 2.0], [0.0, 1.0])
+# The equivalent geometry can be specified explicitly
+vtkhdf_grid(VTKImageData(), "image_explicit", (11, 21, 7);
+            origin = (0, 0, 0), spacing = (0.1, 0.1, 0.5)) do vtk
+    vtk["u"] = rand(11, 21, 7)
+end
 
-# StructuredGrid: explicit point positions, (3, ni, nj, nk)
-vtkhdf_grid("struct", xyz)
+# RectilinearGrid: possibly nonuniform coordinate vectors
+vtkhdf_grid("rect", [0.0, 1.0, 2.5], [0.0, 2.0], [0.0, 1.0]) do vtk
+    vtk["u"] = rand(3, 2, 2)
+end
+
+# StructuredGrid: arbitrary point positions as a (3, ni, nj, nk) array
+xyz = rand(3, 4, 3, 2)
+vtkhdf_grid("struct", xyz) do vtk
+    vtk["u"] = rand(4, 3, 2)
+end
+nothing #hide
 ```
 
 ### Time series
@@ -142,11 +197,15 @@ vtkhdf_grid("struct", xyz)
 Opening a grid, table or composite-block constructor with `temporal = true`
 enables [`write_timestep`](@ref):
 
-```julia
+```@example manual
+points = rand(3, 4)
+cells = [MeshCell(VTKCellTypes.VTK_TETRA, 1:4)]
+timesteps = 0.0:0.1:1.0
+
 vtk = vtkhdf_grid("simulation", points, cells; temporal = true)
-for (t, u) in timesteps
+for t in timesteps
     write_timestep(vtk, t) do frame
-        frame["u"] = u
+        frame["u"] = fill(t, 4)  # every point stores the current time
     end
 end
 close(vtk)
@@ -155,10 +214,14 @@ close(vtk)
 The geometry is written once and reused by every step (the file stores
 per-step read offsets). To change the geometry, pass it to the step:
 
-```julia
-write_timestep(vtk, t; points = new_points, cells = new_cells) do frame
-    frame["u"] = u
+```@example manual
+vtk = vtkhdf_grid("moving", points, cells; temporal = true)
+for t in timesteps
+    write_timestep(vtk, t; points = points .+ t, cells = cells) do frame
+        frame["u"] = rand(4)
+    end
 end
+close(vtk)
 ```
 
 (similarly `x`/`y`/`z` for RectilinearGrid and `points` for StructuredGrid;
@@ -169,20 +232,23 @@ frozen by the first step, and violations throw immediately.
 
 ### Table
 
-```julia
+```@example manual
 vtkhdf_table("data") do tbl
     tbl["pressure"] = rand(100)
     tbl["id"] = collect(1:100)
 end
+nothing #hide
 ```
 
 ### Overlapping AMR
 
-```julia
+```@example manual
+ρ = rand(125)   # one value per cell of the 5×5×5 box below
 vtkhdf_amr("amr"; origin = (0, 0, 0)) do amr
     lvl = add_level(amr; spacing = (1.0, 1.0, 1.0))
     add_box(lvl, (0, 4, 0, 4, 0, 4); celldata = ("ρ" => ρ,))
 end
+nothing #hide
 ```
 
 Boxes are inclusive cell-index extents; data sizes are validated against them.
@@ -194,15 +260,21 @@ A low-level interface following the file format directly; see
 
 ### Composite files
 
-```julia
+```@example manual
+points = rand(3, 4)
+cells = [MeshCell(VTKCellTypes.VTK_TETRA, 1:4)]
+spoints = rand(3, 4)
+polys = [MeshCell(PolyData.Polys(), [1, 2, 3, 4])]
+
 vtkhdf_collection("multi") do col          # or vtkhdf_multiblock
     mesh = vtkhdf_grid(col, "Mesh", points, cells)
-    mesh["u"] = u
+    mesh["u"] = rand(4)
     surf = vtkhdf_grid(col, "Surf", spoints, polys)
     solids = add_node(col, "solids")       # assembly hierarchy
     add_block_ref(solids, mesh)
     add_block_ref(add_node(col, "surfaces"), surf)
 end
+nothing #hide
 ```
 
 The *assembly* is an optional tree of named nodes referencing the blocks —
@@ -216,14 +288,15 @@ must write the same time values).
 this package or by any other spec-conforming writer such as VTK itself
 (spec major versions 1 and 2 are accepted).
 
-```julia
+```@example manual
 vtkhdf_open("mesh") do r
     VTKHDF.dataset_type(r)      # "UnstructuredGrid", ...
     points = read_points(r)     # 3×N matrix
     cells = read_cells(r)       # MeshCell/VTKPolyhedron vector, 1-based ids
-    u = r["u"]                  # data arrays: see "Data arrays" above
+    height = r["height"]        # data arrays: see "Data arrays" above
     keys(r, VTKPointData())
 end
+nothing #hide
 ```
 
 Active-attribute marks (see [Data arrays](@ref data-arrays)) are queried
@@ -246,7 +319,7 @@ names are unexported):
 For a temporal file ([`VTKHDF.is_temporal`](@ref)), geometry and data are
 read through step views:
 
-```julia
+```@example manual
 vtkhdf_open("simulation") do r
     for i in 1:VTKHDF.nsteps(r)
         step = read_timestep(r, i)
@@ -263,13 +336,14 @@ Opening a `PartitionedDataSetCollection`/`MultiBlockDataSet` returns a
 collection reader; blocks are themselves readers and share the file handle
 (closing the collection closes everything):
 
-```julia
+```@example manual
 vtkhdf_open("multi") do col
     keys(col)                        # block names
     mesh = col["Mesh"]               # a block reader
     u = mesh["u"]
     asm = VTKHDF.read_assembly(col)  # the Assembly tree
 end
+nothing #hide
 ```
 
 ### Partitions
@@ -286,3 +360,16 @@ cell *data* is stored partition by partition. The
 `VTKHDF.partition_ranges(r).cells_by_category` field maps each partition's
 cells per category into the cell-data arrays. With a single partition the
 two orders coincide and no care is needed.
+
+```@example manual
+foreach( #hide
+    filename -> rm(filename; force = true), #hide
+    ( #hide
+        "arrays.vtkhdf", "mesh.vtkhdf", "poly.vtkhdf", "partitioned.vtkhdf", #hide
+        "surface.vtkhdf", "image_ranges.vtkhdf", "image_explicit.vtkhdf", #hide
+        "rect.vtkhdf", "struct.vtkhdf", #hide
+        "simulation.vtkhdf", "moving.vtkhdf", "data.vtkhdf", "amr.vtkhdf", #hide
+        "multi.vtkhdf", #hide
+    ), #hide
+) #hide
+```
