@@ -4,8 +4,8 @@
 # specification: a PolyData opened with `temporal = true` and written one
 # time step at a time. The geometry is stored exactly once; each step
 # appends only its data arrays, together with per-step read offsets under
-# `/VTKHDF/Steps`. (Passing `points`/`cells` to `write_timestep` would
-# append updated geometry instead of reusing it.)
+# `/VTKHDF/Steps`. Passing `points`/`cells` to `write_timestep` would
+# append updated geometry instead.
 #
 # **What you'll learn:** how to append time steps with fixed geometry and how
 # to read each step through a timestep view.
@@ -57,18 +57,18 @@ r = vtkhdf_open("wave")
 
 #-
 
-frame = read_timestep(r, 5)
+step = read_timestep(r, 5)
 
 # Each step supports the same accessors as a static file; the data of step 5
 # is exactly what was written for `t = 0.4`:
 
-frame["height"] ≈ height(VTKHDF.time_value(frame))
+step["height"] ≈ height(VTKHDF.time_value(step))
 
 # The file stores a single copy of the unchanged geometry, and
-# `read_points(step)` resolves any step's per-step offsets to it — the
-# caller never needs to know which steps wrote geometry and which reused it:
+# `read_points(step)` resolves each step's offsets to it. The caller never
+# needs to know which steps wrote geometry and which reused it:
 
-size(read_points(frame)), length(read_cells(frame).polygons)
+size(read_points(step)), length(read_cells(step).polygons)
 
 #-
 

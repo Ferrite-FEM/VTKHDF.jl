@@ -1,14 +1,15 @@
 # # UnstructuredGrid: partitioned mesh
 #
 # Port of the `can-pvtu.vtkhdf` example from the VTKHDF specification: an
-# UnstructuredGrid written as three partitions (as a three-rank MPI
-# simulation would produce), each carrying point and cell data, plus a
-# global FieldData array. All partitions land in one file; VTK reads them
-# back as a partitioned dataset. The three partitions colored by `EQPS`, with
-# a few `VEL` arrow glyphs:
+# UnstructuredGrid written as three partitions, as a three-rank MPI
+# simulation would produce. Each partition carries point and cell data, and
+# the file also holds a global FieldData array. All partitions land in one
+# file; VTK reads them back as a partitioned dataset.
 #
 # **What you'll learn:** how to append partitions with local geometry and
 # data, then recover their global ranges when reading.
+#
+# The three partitions colored by `EQPS`, with a few `VEL` arrow glyphs:
 #
 # ![Partitioned hexahedra mesh colored by EQPS](../assets/examples/unstructured_grid-light.png)
 # ![Partitioned hexahedra mesh colored by EQPS](../assets/examples/unstructured_grid-dark.png)
@@ -56,30 +57,30 @@ close(vtk)
 #
 # The same file can be opened again with [`vtkhdf_open`](@ref):
 
-r_can = vtkhdf_open("can")
+r = vtkhdf_open("can")
 
-# Geometry comes back through [`read_points`](@ref)/[`read_cells`](@ref),
-# with the partitions concatenated and cell connectivity rebased to global
-# point ids, so the cells index directly into the returned points:
+# Geometry comes back through [`read_points`](@ref)/[`read_cells`](@ref).
+# The partitions are concatenated and the cell connectivity is renumbered
+# to match, so the cells index directly into the returned points.
 
 # Each partition contributes `4³ = 64` points and `3³ = 27` cells, so the
 # combined reader exposes 192 points and 81 cells:
 
-size(read_points(r_can)), length(read_cells(r_can)) # ((3, 192), 81)
+size(read_points(r)), length(read_cells(r)) # ((3, 192), 81)
 
 # Data arrays use the same indexing syntax as writing, and the partition
 # structure is recoverable as index ranges into them:
 
 # The three constant partition values span 0.1 through 0.3:
 
-extrema(r_can["EQPS", VTKCellData()]) # (0.1, 0.3)
+extrema(r["EQPS", VTKCellData()]) # (0.1, 0.3)
 
 #-
 
 # These ranges show which 27-cell slice came from each partition:
 
-VTKHDF.partition_ranges(r_can).cells # [1:27, 28:54, 55:81]
+VTKHDF.partition_ranges(r).cells # [1:27, 28:54, 55:81]
 
 #-
 
-close(r_can)
+close(r)

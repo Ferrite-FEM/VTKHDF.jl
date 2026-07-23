@@ -105,6 +105,17 @@ location_group(::VTKPointData) = "PointData"
 location_group(::VTKCellData) = "CellData"
 location_group(::VTKFieldData) = "FieldData"
 
+"""
+    vtk["name"] = data
+    vtk["name", loc] = data
+    vtk["name", loc, attribute = :Scalars] = data
+
+Write a data array. Without a location the location is inferred from the
+array size; `loc` (`VTKPointData()`, `VTKCellData()`, `VTKFieldData()`,
+`VTKRowData()`) gives it explicitly. `attribute` (`:Scalars`, `:Vectors`,
+...) marks the array as the location's active attribute. See the manual's
+[Data arrays](@ref data-arrays) for the accepted array shapes.
+"""
 function Base.setindex!(vtk::VTKHDFFile, data, name::AbstractString; attribute::Union{Nothing, Symbol} = nothing)
     return set_data!(vtk, data, name, nothing; attribute)
 end

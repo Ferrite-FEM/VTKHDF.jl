@@ -24,6 +24,12 @@ vtkhdf_collection
 vtkhdf_multiblock
 ```
 
+### Data arrays
+
+```@docs
+Base.setindex!(::VTKHDF.VTKHDFFile, ::Any, ::AbstractString)
+```
+
 ### Time series
 
 ```@docs
@@ -57,6 +63,12 @@ read_timestep
 read_points
 read_cells
 read_coordinates
+```
+
+### Data arrays
+
+```@docs
+Base.getindex(::VTKHDF.VTKHDFReader, ::AbstractString)
 Base.keys(::VTKHDF.VTKHDFReader, ::VTKHDF.VTKBase.AbstractFieldData)
 Base.keys(::VTKHDF.VTKHDFCollectionReader)
 Base.getindex(::VTKHDF.VTKHDFCollectionReader, ::AbstractString)

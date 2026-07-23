@@ -1,24 +1,31 @@
 # [Manual](@id manual)
 
-The package writes and reads all VTKHDF dataset types. A few conventions are
-shared by everything: filenames without an extension get `.vtkhdf` appended,
-every writer constructor and [`vtkhdf_open`](@ref) support the do-block form
-(closing the file automatically), and data arrays use the same index syntax
-and shapes in both directions.
+Everything builds on two ideas: geometry, and data arrays attached to it.
+The manual introduces those first. [Writing](@ref writing) then covers each
+dataset type; [Reading](@ref reading) does not depend on it, so skip ahead
+if you only want to read existing files.
 
-Complete runnable programs, ported from the reference files shown in the
-VTKHDF specification, are in the [Examples](@ref) section (and in the
-`examples/` folder of the repository).
+Conventions shared by everything:
+
+- filenames without an extension get `.vtkhdf` appended,
+- every writer constructor and [`vtkhdf_open`](@ref) support the do-block
+  form used below, which closes the file automatically,
+- data arrays use the same index syntax for writing and reading:
+  `vtk["name"] = data` and `r["name"]`.
+
+The [Examples](@ref) section contains complete runnable programs, one per
+reference file of the VTKHDF specification (also in the repository's
+`examples/` folder).
 
 ```@setup manual
 using VTKHDF
 ```
 
-## A grid in two parts
+## Points and cells
 
-An unstructured grid consists of point coordinates and cells that connect
-those points. Each column of `points` is one 3D point; the integers in a
-`MeshCell` are 1-based column indices:
+The simplest dataset type is the unstructured grid: point coordinates,
+plus cells connecting those points. Each column of `points` is one 3D
+point. The integers in a `MeshCell` are 1-based column indices:
 
 ```@example manual
 points = [
@@ -30,29 +37,36 @@ cells = [MeshCell(VTKCellTypes.VTK_TETRA, [1, 2, 3, 4])]
 nothing #hide
 ```
 
-Here four points form one tetrahedral cell. Other dataset types describe
-their geometry differently, but use the same distinction between values
-attached to points and values attached to cells.
+Four points, one tetrahedral cell. Other dataset types describe their
+geometry differently — an image grid needs no point array at all. But all
+of them make the same distinction, and the rest of the API builds on it:
+data is attached either to the points or to the cells.
 
 ## [Data arrays](@id data-arrays)
 
 Every data array is attached to one of a dataset's data groups, identified
-by a *location* argument: `VTKPointData()` (one value per grid point),
-`VTKCellData()` (one value per cell), `VTKFieldData()` (global arrays,
-independent of the grid), or `VTKRowData()` (table columns). An array can
-additionally be marked as an *active attribute* (`:Scalars`, `:Vectors`,
-...) — the array ParaView/VTK picks by default for coloring, glyphs etc.
-Writing and reading use the same indexing:
+by a *location* argument:
+
+- `VTKPointData()` — one value per grid point,
+- `VTKCellData()` — one value per cell,
+- `VTKFieldData()` — global arrays, independent of the grid,
+- `VTKRowData()` — table columns.
+
+Writing and reading use the same indexing. When writing, the location can
+be omitted if the array size already determines it. The `attribute` keyword
+marks an array as an *active attribute* (`:Scalars`, `:Vectors`, ...): the
+array ParaView/VTK picks by default for coloring, glyphs etc. Using the
+`points` and `cells` from above:
 
 ```@example manual
 vtkhdf_grid("arrays", points, cells) do vtk
     vtk["height"] = points[3, :]          # four values: inferred as point data
-    vtk["material", VTKCellData()] = [1]  # write with explicit location
+    vtk["material", VTKCellData()] = [1]  # explicit location
     vtk["position", VTKPointData(), attribute = :Vectors] = points
 end
 
 vtkhdf_open("arrays") do r
-    r["height"]                           # read; location found by name
+    r["height"]                           # location found by name
     r["material", VTKCellData()]          # read from an explicit location
     keys(r, VTKPointData())               # array names at a location
 end
@@ -71,30 +85,49 @@ convention:
   dimensions can be dropped),
 - strings and vectors of strings as field data (static files only).
 
-Reading returns the values unchanged, as plain arrays in the same
-convention regardless of which input form was used when writing: scalar
-data as a `Vector`, multi-component data as a `(ncomponents, N)` matrix
-(so `SVector` input comes back as its component matrix), image-like data
-with its full `([ncomponents,] nx, ny, nz)` shape, and string field data as
-`Vector{String}`.
+Reading returns plain arrays in this same convention, no matter which input
+form was used when writing:
 
-If a size matches both the points and the cells (or, when reading, a name
-exists at several locations), the location must be given explicitly. Names
-must not contain `/` or `.` (a VTKHDF format restriction).
+- scalar data as a `Vector`,
+- multi-component data as a `(ncomponents, N)` matrix (`SVector` input
+  comes back as its component matrix),
+- image-like data with its full `([ncomponents,] nx, ny, nz)` shape,
+- string field data as `Vector{String}`.
 
-## Writing
+If a size matches both the points and the cells, the location must be given
+explicitly. The same holds when reading a name that exists at several
+locations. Names must not contain `/` or `.` (a VTKHDF format restriction).
 
-All files are created through a small family of constructors. Every dataset
-constructor takes `compress = true|0-9` for gzip compression, and the grid
-and table constructors take `temporal = true` for time-dependent writing
-(OverlappingAMR and HyperTreeGrid are static-only). The composite
-constructors (`vtkhdf_collection`/`vtkhdf_multiblock`) take neither — those
-options are passed per block instead.
+## [Writing](@id writing)
+
+All files are created through a small family of constructors; the dataset
+type is inferred from the geometry arguments:
+
+| dataset type | use when | created with |
+|---|---|---|
+| UnstructuredGrid | arbitrary cells connecting explicit points | [`vtkhdf_grid`](@ref)`(file, points, cells)` |
+| PolyData | vertices/lines/polygons/strips on explicit points | `vtkhdf_grid(file, points, polys, ...)` |
+| ImageData | uniformly spaced axis-aligned grid | `vtkhdf_grid(file, xrange, yrange, zrange)` |
+| RectilinearGrid | axis-aligned, per-axis coordinate vectors | `vtkhdf_grid(file, xvec, yvec, zvec)` |
+| StructuredGrid | curved but logically regular grid | `vtkhdf_grid(file, xyz)` |
+| Table | data columns without geometry | [`vtkhdf_table`](@ref)`(file)` |
+| OverlappingAMR | block-structured refinement levels | [`vtkhdf_amr`](@ref)`(file; origin)` |
+| HyperTreeGrid | tree-based refinement | [`vtkhdf_htg`](@ref)`(file; dimensions)` |
+| Collection / MultiBlock | several of the above in one file | [`vtkhdf_collection`](@ref) / [`vtkhdf_multiblock`](@ref) |
+
+Every dataset constructor takes `compress = true|0-9` for gzip compression.
+The grid and table constructors also take `temporal = true` for
+time-dependent writing; OverlappingAMR and HyperTreeGrid are static-only.
+The composite constructors (`vtkhdf_collection`/`vtkhdf_multiblock`) take
+neither — both options are passed per block instead.
 
 ### Unstructured grids
 
+Explicit points and a vector of cells, exactly as in
+[Points and cells](@ref) — any mix of VTK cell types works:
+
 ```@example manual
-points = [                 # unit cube; 3×N matrix, or N-vectors of point-like values
+points = [                 # unit cube corners
     0.0 1.0 1.0 0.0 0.0 1.0 1.0 0.0
     0.0 0.0 1.0 1.0 0.0 0.0 1.0 1.0
     0.0 0.0 0.0 0.0 1.0 1.0 1.0 1.0
@@ -108,8 +141,11 @@ end
 nothing #hide
 ```
 
-1‑ and 2‑dimensional points are zero-padded to 3 components. Polyhedra are
-written by putting [`VTKPolyhedron`](https://juliavtk.github.io/WriteVTK.jl/stable/grids/unstructured/#Polyhedron-cells)
+Points can also be given as a vector of `SVector`/tuple-like values. 1‑ and
+2‑dimensional points are zero-padded to 3 components.
+
+A polyhedron is a cell described by its faces. To write them, put
+[`VTKPolyhedron`](https://juliavtk.github.io/WriteVTK.jl/stable/grids/unstructured/#Polyhedron-cells)
 cells in the cell vector:
 
 ```@example manual
@@ -126,9 +162,9 @@ nothing #hide
 
 #### Partitions
 
-VTKHDF files can store multiple partitions (as produced by e.g. one MPI rank
-each). Creating the file with just the dataset tag defers the geometry;
-partitions are then appended explicitly, with their data:
+A file can store one grid split into multiple partitions — typically one
+per MPI rank of a simulation. Create the file with just the dataset tag,
+without geometry. Then append each partition together with its data:
 
 ```@example manual
 points1, points2 = rand(3, 4), rand(3, 4)
@@ -147,9 +183,9 @@ The same works for PolyData (`vtkhdf_grid(VTKPolyData(), ...)`), where
 
 ### PolyData
 
-Cells use the `PolyData.*` cell types; pass one homogeneous vector per
-category. On disk the categories are ordered Vertices, Lines, Polygons,
-Strips — cell data must be supplied in that concatenated order.
+PolyData describes surface-style geometry. Its cells come in four
+categories: vertices, lines, polygons and triangle strips. Pass one vector
+of `PolyData.*` cells per category, in any argument order:
 
 ```@example manual
 points = rand(3, 4)
@@ -157,9 +193,15 @@ polys = [MeshCell(PolyData.Polys(), [1, 2, 3, 4])]
 lines = [MeshCell(PolyData.Lines(), [1, 3])]
 vtkhdf_grid("surface", points, polys, lines) do vtk
     vtk["height"] = rand(4)
+    vtk["material", VTKCellData()] = [1, 2]   # 1 → the line, 2 → the polygon
 end
 nothing #hide
 ```
+
+A PolyData file stores its cells in a fixed category order: Vertices,
+Lines, Polygons, Strips. Cell data follows that order, not the constructor
+argument order — so the first `material` value belongs to the line, even
+though `polys` was passed first.
 
 ### Structured types
 
@@ -194,8 +236,9 @@ nothing #hide
 
 ### Time series
 
-Opening a grid, table or composite-block constructor with `temporal = true`
-enables [`write_timestep`](@ref):
+To write a time series, create the file with `temporal = true` (grid,
+table and composite-block constructors all accept it). Then add one step
+at a time with [`write_timestep`](@ref):
 
 ```@example manual
 points = rand(3, 4)
@@ -224,13 +267,18 @@ end
 close(vtk)
 ```
 
-(similarly `x`/`y`/`z` for RectilinearGrid and `points` for StructuredGrid;
-ImageData arrays get a time dimension automatically.)
+RectilinearGrid takes `x`/`y`/`z` the same way and StructuredGrid takes
+`points`; ImageData arrays get a time dimension automatically.
 
-The set of arrays and their types must be identical in every step — it is
-frozen by the first step, and violations throw immediately.
+Every step must write the same arrays, with the same element types, as the
+first step. Adding an array, leaving one out, or changing its type in a
+later step throws an error immediately.
 
 ### Table
+
+A table has no geometry, only columns of equal length. A column is an
+ordinary [data array](@ref data-arrays) with location [`VTKRowData`](@ref)
+— the default for tables, so it can be left out:
 
 ```@example manual
 vtkhdf_table("data") do tbl
@@ -242,6 +290,10 @@ nothing #hide
 
 ### Overlapping AMR
 
+An overlapping AMR grid is a stack of refinement levels over a shared
+origin. Each level has its own spacing and holds boxes of cells. A box is
+given as inclusive cell-index extents:
+
 ```@example manual
 ρ = rand(125)   # one value per cell of the 5×5×5 box below
 vtkhdf_amr("amr"; origin = (0, 0, 0)) do amr
@@ -251,14 +303,59 @@ end
 nothing #hide
 ```
 
-Boxes are inclusive cell-index extents; data sizes are validated against them.
+`add_box` checks that each data array has one value per cell of the box —
+here `5 × 5 × 5 = 125`, since the extents are inclusive.
 
 ### HyperTreeGrid
 
-A low-level interface following the file format directly; see
-[`vtkhdf_htg`](@ref) and [`add_piece`](@ref) for the field descriptions.
+A HyperTreeGrid is a coarse grid whose cells can be refined recursively,
+quadtree/octree style. Each coarse cell is the root of a *tree*: splitting
+a cell gives `branch_factor` children per non-singleton direction, and a
+child can be split again. The coordinate vectors define the coarse grid.
+The interface mirrors the file format: the tree structure is passed as
+flat arrays, tree by tree, level by level.
+
+```@example manual
+# 3×3×1 coordinate points => a 2×2 grid of trees:
+#
+#   2.0 ┌───┬───┐
+#       │ 2 │ 3 │
+#   1.0 ├───┼───┤      tree 0 is refined once (root + 2² children),
+#       │ 0 │ 1 │      trees 1-3 stay single cells => 8 cells total
+#   0.0 └───┴───┘
+#      0.0  1.0  2.0
+vtkhdf_htg("htg"; dimensions = (3, 3, 1), branch_factor = 2) do htg
+    add_piece(
+        htg;
+        # one bit per cell of every non-deepest level: only tree 0's
+        # root has children
+        descriptors = [true],
+        depth_per_tree = [2, 1, 1, 1],
+        tree_ids = [0, 1, 2, 3],
+        # cells per depth, tree by tree: tree 0 has 1 root + 4 children
+        number_of_cells_per_tree_depth = [1, 4, 1, 1, 1],
+        xcoordinates = [0.0, 1.0, 2.0],
+        ycoordinates = [0.0, 1.0, 2.0],
+        zcoordinates = [0.0],
+        # cell data follows the same order: tree by tree, level by level
+        celldata = ("depth" => Float64[0, 1, 1, 1, 1, 0, 0, 0],)
+    )
+end
+nothing #hide
+```
+
+An optional `mask::Vector{Bool}` (same cell order) hides cells: a `true`
+entry masks that cell, removing it from visualization. Refined cells
+cannot be masked. See [`vtkhdf_htg`](@ref) and [`add_piece`](@ref) for all
+fields.
 
 ### Composite files
+
+A collection stores several independent datasets as named *blocks* of one
+file. Blocks are created with the usual constructors, with the collection
+as the first argument. Each block then accepts the same API as a standalone
+file, including `temporal = true` (all temporal blocks must write the same
+time values):
 
 ```@example manual
 points = rand(3, 4)
@@ -277,16 +374,15 @@ end
 nothing #hide
 ```
 
-The *assembly* is an optional tree of named nodes referencing the blocks —
-the grouping hierarchy ParaView shows for the file. Blocks accept the same
-API as standalone files, including `temporal = true` (all temporal blocks
-must write the same time values).
+The *assembly* built by [`add_node`](@ref)/[`add_block_ref`](@ref) is an
+optional tree of named nodes referencing the blocks. ParaView shows it as
+the file's grouping hierarchy.
 
-## Reading
+## [Reading](@id reading)
 
-[`vtkhdf_open`](@ref) opens a VTKHDF file for reading — files written by
-this package or by any other spec-conforming writer such as VTK itself
-(spec major versions 1 and 2 are accepted).
+[`vtkhdf_open`](@ref) opens a VTKHDF file for reading. The file may come
+from this package or from any other spec-conforming writer, such as VTK
+itself (spec major versions 1 and 2 are accepted).
 
 ```@example manual
 vtkhdf_open("mesh") do r
@@ -300,9 +396,9 @@ nothing #hide
 ```
 
 Active-attribute marks (see [Data arrays](@ref data-arrays)) are queried
-with `VTKHDF.active_attributes(r, loc)`. Beyond the common API, each
-dataset type has a few specific accessors (written as shown — qualified
-names are unexported):
+with `VTKHDF.active_attributes(r, loc)`. Each dataset type also adds a few
+accessors of its own. They are unexported — call them qualified, as
+written:
 
 | dataset type | accessors |
 |---|---|
@@ -333,8 +429,8 @@ end
 ### Composite files
 
 Opening a `PartitionedDataSetCollection`/`MultiBlockDataSet` returns a
-collection reader; blocks are themselves readers and share the file handle
-(closing the collection closes everything):
+collection reader. Its blocks are themselves readers and share the file
+handle, so closing the collection closes everything:
 
 ```@example manual
 vtkhdf_open("multi") do col
@@ -349,16 +445,16 @@ nothing #hide
 ### Partitions
 
 Multi-partition UnstructuredGrid/PolyData files are returned as one grid:
-`read_points` stacks the partitions and `read_cells` renumbers connectivity
-to match, so the result is directly usable (and writable again). To recover
-the partition structure, `VTKHDF.partition_ranges(r)` gives each partition's
-index range into the point and cell data arrays.
+`read_points` stacks the partitions, and `read_cells` renumbers the
+connectivity to match. The result is usable as is, and can be written again.
+`VTKHDF.partition_ranges(r)` recovers the partition structure — each
+partition's index range into the point and cell data arrays.
 
-One caveat is inherited from the file format, for multi-partition PolyData
-only: cells are stored per category (vertices/lines/polygons/strips) but
-cell *data* is stored partition by partition. The
+Multi-partition PolyData has one caveat, inherited from the file format:
+cells are stored per category (vertices/lines/polygons/strips), but cell
+*data* is stored partition by partition. The
 `VTKHDF.partition_ranges(r).cells_by_category` field maps each partition's
-cells per category into the cell-data arrays. With a single partition the
+cells, per category, into the cell-data arrays. With a single partition the
 two orders coincide and no care is needed.
 
 ```@example manual
@@ -369,6 +465,7 @@ foreach( #hide
         "surface.vtkhdf", "image_ranges.vtkhdf", "image_explicit.vtkhdf", #hide
         "rect.vtkhdf", "struct.vtkhdf", #hide
         "simulation.vtkhdf", "moving.vtkhdf", "data.vtkhdf", "amr.vtkhdf", #hide
+        "htg.vtkhdf", #hide
         "multi.vtkhdf", #hide
     ), #hide
 ) #hide

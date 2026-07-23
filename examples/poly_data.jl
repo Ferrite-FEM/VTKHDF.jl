@@ -3,8 +3,8 @@
 # Port of the `test_poly_data.vtkhdf` example from the VTKHDF specification:
 # a closed polygonal surface with `Normals` and `Warping` point vectors and
 # a `Materials` cell array. PolyData files always store the four cell
-# categories Vertices, Lines, Polygons and Strips (in that order, which is
-# also the cell-data order); only Polygons is populated here.
+# categories Vertices, Lines, Polygons and Strips, in that order (cell data
+# follows the same order). Only Polygons is populated here.
 #
 # **What you'll learn:** how to build polygon connectivity, attach point
 # vectors and cell scalars, and inspect PolyData's cell categories.
@@ -17,7 +17,7 @@
 using VTKHDF
 
 nu, nv = 48, 24
-R, r = 1.0f0, 0.4f0
+R, a = 1.0f0, 0.4f0   # major/minor radius
 
 points = Matrix{Float32}(undef, 3, nu * nv)
 normals = similar(points)
@@ -26,7 +26,7 @@ id(iu, iv) = mod(iu, nu) + 1 + nu * mod(iv, nv)
 for iv in 0:(nv - 1), iu in 0:(nu - 1)
     u, v = 2π * iu / nu, 2π * iv / nv
     normal = (cos(v) * cos(u), cos(v) * sin(u), sin(v))
-    points[:, id(iu, iv)] .= (R * cos(u), R * sin(u), 0) .+ r .* normal
+    points[:, id(iu, iv)] .= (R * cos(u), R * sin(u), 0) .+ a .* normal
     normals[:, id(iu, iv)] .= normal
     warping[:, id(iu, iv)] .= 0.2 * sin(3u) .* normal
 end
@@ -52,17 +52,17 @@ nothing #hide
 #
 # PolyData cells come back grouped by category:
 
-r_torus = vtkhdf_open("torus")
-map(length, read_cells(r_torus))
+r = vtkhdf_open("torus")
+map(length, read_cells(r))
 
 # Data arrays and active-attribute marks round-trip:
 
-r_torus["Materials", VTKCellData()] == materials
+r["Materials", VTKCellData()] == materials
 
 #-
 
-VTKHDF.active_attributes(r_torus, VTKPointData())
+VTKHDF.active_attributes(r, VTKPointData())
 
 #-
 
-close(r_torus)
+close(r)
