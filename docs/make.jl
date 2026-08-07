@@ -1,4 +1,5 @@
 using Documenter
+using DocumenterCodeBlocks
 using Literate
 using VTKHDF
 
@@ -67,6 +68,7 @@ makedocs(
         assets = ["assets/custom.css"],
     ),
     checkdocs = :exports,
+    plugins = [CodeBlocks()],
 )
 
 deploydocs(
