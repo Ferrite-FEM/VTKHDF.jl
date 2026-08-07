@@ -577,10 +577,12 @@ function read_points end
 """
     read_cells(r_or_step)
 
-The cells of an UnstructuredGrid (a vector of `MeshCell`/`VTKPolyhedron`
-with 1-based connectivity into [`read_points`](@ref)), or of a PolyData
-(a NamedTuple `(; vertices, lines, polygons, strips)` of `MeshCell`
-vectors). Multi-partition files are concatenated with point ids rebased;
+The cells of an UnstructuredGrid or PolyData file.
+
+For UnstructuredGrid, a vector of `MeshCell`/`VTKPolyhedron` with 1-based
+connectivity into [`read_points`](@ref); for PolyData, a NamedTuple
+`(; vertices, lines, polygons, strips)` of `MeshCell` vectors.
+Multi-partition files are concatenated with point ids rebased;
 see [`partition_ranges`](@ref) for the partition structure.
 """
 function read_cells end

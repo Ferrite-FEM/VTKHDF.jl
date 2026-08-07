@@ -59,9 +59,11 @@ totals_snapshot(k::UnstructuredState) =
     add_partition(vtk, points, cellvecs...; pointdata = (), celldata = ())  # PolyData
 
 Append one partition of geometry (and optionally its data) to an
-unstructured grid or poly data file (usually one created without geometry,
-via `vtkhdf_grid(VTKUnstructuredGrid(), filename)` /
-`vtkhdf_grid(VTKPolyData(), filename)`). For PolyData, pass one homogeneous
+unstructured grid or poly data file.
+
+Such a file is usually created without geometry, via
+`vtkhdf_grid(VTKUnstructuredGrid(), filename)` /
+`vtkhdf_grid(VTKPolyData(), filename)`. For PolyData, pass one homogeneous
 cell vector per category, as in the constructor. For temporal files this
 must be called inside [`write_timestep`](@ref) (all partitions of a step
 must be supplied when its geometry changes); a file created without

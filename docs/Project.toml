@@ -1,10 +1,12 @@
 [deps]
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+DocumenterCodeBlocks = "b6400b83-267f-4b55-9fd8-bffc853bdfd8"
 Literate = "98b081ad-f1c9-55d3-8b20-4c87d4299306"
 VTKHDF = "45d8cf6f-ab5f-45bc-ab92-77e36ab192e6"
 
 [compat]
 Documenter = "1"
+DocumenterCodeBlocks = "1"
 Literate = "2"
 
 [sources]
