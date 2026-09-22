@@ -1,8 +1,10 @@
 # ImageData / RectilinearGrid / StructuredGrid readers.
 #
 # Point/cell arrays of these kinds are stored whole, HDF shape
-# (nz, ny, nx[, ncomp]) == Julia ([ncomp,] nx, ny, nz); temporal files append
-# a trailing Julia time dimension, so step i is a plain index there.
+# (nz, ny, nx[, ncomp]) == Julia ([ncomp,] nx, ny, nz), usually without the
+# directions that have a single point (VTK's layout, see `file_dims`);
+# temporal files append a trailing Julia time dimension, so step i is a plain
+# index there. Arrays are returned in the full ([ncomp,] nx, ny, nz) shape.
 
 abstract type ReadStructuredKind <: ReaderKind end
 
@@ -47,13 +49,27 @@ function read_image_kind(root::HDF5.Group)
     return ReadImage(dims, origin, spacing, direction, ext)
 end
 
+# RectilinearGrid/StructuredGrid size the grid with a `Dimensions` attribute
+# (the extent is implicitly zero-based); files written by earlier versions of
+# this package only have `WholeExtent`.
+function read_dimensions(root)
+    dims = read_attr_tuple(root, "Dimensions", Int, Val(3))
+    dims === nothing && return read_whole_extent(root)
+    all(>=(1), dims) || error("invalid Dimensions $dims")
+    ext = read_attr_tuple(root, "WholeExtent", Int, Val(6))
+    ext === nothing && return (0, dims[1] - 1, 0, dims[2] - 1, 0, dims[3] - 1), dims
+    ntuple(i -> ext[2i] - ext[2i - 1] + 1, 3) == dims ||
+        error("$(HDF5.name(root)): WholeExtent $ext does not match Dimensions $dims")
+    return ext, dims
+end
+
 function read_rectilinear_kind(root::HDF5.Group)
-    ext, dims = read_whole_extent(root)
+    ext, dims = read_dimensions(root)
     return ReadRectilinear(dims, ext)
 end
 
 function read_structured_kind(root::HDF5.Group)
-    ext, dims = read_whole_extent(root)
+    ext, dims = read_dimensions(root)
     return ReadStructured(dims, ext)
 end
 
@@ -94,9 +110,7 @@ end
 # ---- data arrays ----
 
 function read_static_array(kind::ReadStructuredKind, loc::Union{VTKPointData, VTKCellData}, ds::HDF5.Dataset)
-    A = read(ds)
-    check_spatial_shape(kind, loc, size(A), HDF5.name(ds))
-    return A
+    return grid_shaped(kind, loc, read(ds), HDF5.name(ds))
 end
 
 function read_step_array(
@@ -105,16 +119,29 @@ function read_step_array(
     )
     nd = ndims(ds)
     A = ds[ntuple(_ -> Colon(), nd - 1)..., i]
-    check_spatial_shape(kind, loc, size(A), HDF5.name(ds))
-    return A
+    return grid_shaped(kind, loc, A, HDF5.name(ds))
 end
 
-function check_spatial_shape(kind::ReadStructuredKind, loc, ashape::Tuple, name::String)
+# Bring an array read from the file to the full ([ncomp,] nx, ny, nz) shape,
+# whether the file dropped the single-point directions (as VTK does), kept
+# them, or stored a scalar with an explicit component dimension.
+function grid_shaped(kind::ReadStructuredKind, loc, A::AbstractArray, name::String)
     dims = loc isa VTKPointData ? point_dims(kind) : cell_dims(kind)
-    spatial_ncomp(ashape, dims) === nothing && error(
-        "array $name has shape $ashape, which does not match the " *
+    ncomp = file_ncomp(size(A), dims)
+    ncomp === nothing && error(
+        "array $name has shape $(size(A)), which does not match the " *
             (loc isa VTKPointData ? "point" : "cell") * " dimensions $dims"
     )
+    return reshape(A, ncomp == 1 ? dims : (ncomp, dims...))
+end
+
+drop_ones(dims::Tuple) = Tuple(d for d in dims if d != 1)
+
+# Number of components of a file array, or nothing if the shape does not fit.
+function file_ncomp(ashape::Tuple, dims::NTuple{3, Int})
+    sd = drop_ones(dims)
+    drop_ones(ashape) == sd && return 1
+    length(ashape) >= 2 && drop_ones(ashape[2:end]) == sd && return ashape[1]
     return nothing
 end
 

@@ -1,5 +1,7 @@
 # RectilinearGrid writer (spec 2.7): like ImageData plus explicit
-# X/Y/ZCoordinates datasets.
+# X/Y/ZCoordinates datasets. The grid size is the `Dimensions` attribute
+# (VTK reads nothing else); `WholeExtent` is written as well for the
+# `whole_extent` option and this package's reader.
 
 mutable struct RectilinearState <: StructuredKind
     pdims::NTuple{3, Int}
@@ -20,6 +22,7 @@ function init_rectilinear(
     file, root = open_dest(dest)
     write_ascii_attribute(root, "Type", "RectilinearGrid")
     write_version_attribute(root, (2, 7))
+    HDF5.attrs(root)["Dimensions"] = Int64[dims...]
     HDF5.attrs(root)["WholeExtent"] = Int64[ext...]
     vtk = make_vtkfile(
         file, root, RectilinearState(dims, [0, 0, 0], [nothing, nothing, nothing]);

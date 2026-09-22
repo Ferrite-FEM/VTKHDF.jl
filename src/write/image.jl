@@ -2,9 +2,11 @@
 # RectilinearGrid and StructuredGrid.
 #
 # On disk, arrays of these kinds have HDF shape (nz, ny, nx[, ncomp]) which is
-# exactly a Julia array ([ncomp,] nx, ny, nz) written unpermuted. Temporal
-# files prepend a time dimension on disk, i.e. append along the last Julia
-# dimension.
+# exactly a Julia array ([ncomp,] nx, ny, nz) written unpermuted, except that
+# VTK drops every direction with a single point from the shape: a 2-D image
+# (nz = 1) has rank-2 arrays (ny, nx[, ncomp]) and a 1-D image rank-1 ones,
+# for point and cell data alike (see `file_dims`). Temporal files prepend a
+# time dimension on disk, i.e. append along the last Julia dimension.
 
 abstract type StructuredKind <: DatasetKind end
 
@@ -27,6 +29,17 @@ end
 
 point_dims(kind::StructuredKind) = kind.pdims
 cell_dims(kind::StructuredKind) = max.(point_dims(kind) .- 1, 1)
+
+# Spatial shape of a point/cell array on disk (Julia order): the grid
+# dimensions without the directions that have a single point. This is the
+# layout vtkHDFReader expects and vtkHDFWriter produces; with the degenerate
+# directions kept, VTK fails to read 1-D and 2-D grids.
+function file_dims(kind::StructuredKind, loc::Union{VTKPointData, VTKCellData})
+    pdims = point_dims(kind)
+    dims = loc isa VTKPointData ? pdims : cell_dims(kind)
+    kept = Tuple(dims[i] for i in 1:3 if pdims[i] > 1)
+    return isempty(kept) ? (1,) : kept
+end
 
 mutable struct ImageState <: StructuredKind
     pdims::NTuple{3, Int}
@@ -106,7 +119,8 @@ function write_array!(
                 "point" : "cell"
         ) dimensions $dims"
     )
-    rowdims = ncomp == 1 ? dims : (ncomp, dims...)
+    fdims = file_dims(kind, loc)
+    rowdims = ncomp == 1 ? fdims : (ncomp, fdims...)
     A = reshape(data, rowdims)
     groupname = location_group(loc)
     grp = get_or_create_group(vtk.root, groupname)

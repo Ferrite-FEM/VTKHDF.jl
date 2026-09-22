@@ -85,10 +85,11 @@ currently out of scope (VTK's own writer does not produce them either).
 
 !!! note "Opening files in ParaView/VTK"
     RectilinearGrid, StructuredGrid and Table are recent additions to the
-    VTKHDF specification (2.7/2.8) and require a VTK build new enough to
-    read them. All other types round-trip against VTK 9.6's `vtkHDFReader`
-    in this package's test suite. This package's own [reading
-    support](@ref reading) handles all types listed above.
+    VTKHDF specification (2.7/2.8) and need VTK 9.7 or newer to be read;
+    older versions (ParaView 6.1 and earlier) reject them as an unknown
+    dataset type. All other types round-trip against VTK 9.6's
+    `vtkHDFReader` in this package's test suite. This package's own
+    [reading support](@ref reading) handles all types listed above.
 
 ## Development
 
