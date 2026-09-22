@@ -1,0 +1,43 @@
+/* Example screenshots come in light/dark pairs (docs/screenshots.py);
+   show the variant matching the active theme. */
+img[src$="-dark.png"] {
+    display: none;
+}
+
+html:is(.theme--documenter-dark, .theme--catppuccin-frappe, .theme--catppuccin-macchiato, .theme--catppuccin-mocha) img[src$="-light.png"] {
+    display: none;
+}
+
+html:is(.theme--documenter-dark, .theme--catppuccin-frappe, .theme--catppuccin-macchiato, .theme--catppuccin-mocha) img[src$="-dark.png"] {
+    display: inline;
+}
+
+/* Card grid on the examples overview page (generated in make.jl). */
+.example-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+    gap: 1rem;
+}
+
+.example-card {
+    display: block;
+    padding: 0.75rem;
+    border: 1px solid rgba(128, 128, 128, 0.35);
+    border-radius: 8px;
+    text-align: center;
+    color: inherit;
+    text-decoration: none;
+}
+
+.example-card:hover {
+    border-color: rgba(128, 128, 128, 0.7);
+}
+
+.example-card img {
+    max-width: 100%;
+}
+
+.example-card-title {
+    margin-top: 0.5rem;
+    font-weight: 600;
+}
