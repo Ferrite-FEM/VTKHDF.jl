@@ -187,6 +187,37 @@ end
         @test read_timestep(r, 1)["u"] == reshape([1.0, 2.0], 2, 1, 1)
     end
 
+    # Rectilinear as VTK writes it: only `Dimensions`, and the arrays without
+    # the single-point directions ((t, x) on disk here); reads come back in
+    # the full grid shape
+    fn = fixture(joinpath(dir, "rect_dims.vtkhdf"); version = Int64[2, 7]) do root
+        HDF5.attrs(root)["Type"] = "RectilinearGrid"
+        HDF5.attrs(root)["Dimensions"] = Int64[2, 1, 1]
+        HDF5.write_dataset(root, "XCoordinates", [0.0, 1.0])
+        HDF5.write_dataset(root, "YCoordinates", [0.0])
+        HDF5.write_dataset(root, "ZCoordinates", [0.0])
+        pd = HDF5.create_group(root, "PointData")
+        HDF5.write_dataset(pd, "p", reshape([1.0, 2.0, 3.0, 4.0], 2, 2))
+        sg = HDF5.create_group(root, "Steps")
+        HDF5.attrs(sg)["NSteps"] = Int64(2)
+        HDF5.write_dataset(sg, "Values", [0.0, 1.0])
+    end
+    vtkhdf_open(fn) do r
+        @test VTKHDF.grid_info(r) == (dims = (2, 1, 1), whole_extent = (0, 1, 0, 0, 0, 0))
+        @test read_timestep(r, 2)["p"] == reshape([3.0, 4.0], 2, 1, 1)
+    end
+
+    # Dimensions and WholeExtent that disagree
+    fn = fixture(joinpath(dir, "rect_bad.vtkhdf"); version = Int64[2, 7]) do root
+        HDF5.attrs(root)["Type"] = "RectilinearGrid"
+        HDF5.attrs(root)["Dimensions"] = Int64[2, 1, 1]
+        HDF5.attrs(root)["WholeExtent"] = Int64[0, 2, 0, 0, 0, 0]
+        HDF5.write_dataset(root, "XCoordinates", [0.0, 1.0])
+        HDF5.write_dataset(root, "YCoordinates", [0.0])
+        HDF5.write_dataset(root, "ZCoordinates", [0.0])
+    end
+    @test_throws ErrorException vtkhdf_open(fn)
+
     # a temporal array whose trailing dimension disagrees with NSteps
     fn = fixture(joinpath(dir, "badslabs.vtkhdf"); version = Int64[2, 7]) do root
         HDF5.attrs(root)["Type"] = "RectilinearGrid"

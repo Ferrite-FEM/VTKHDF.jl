@@ -8,6 +8,11 @@ const PY = Sys.which("python3")
 const HAS_VTK = PY !== nothing &&
     success(pipeline(`$PY -c "import vtkmodules.vtkIOHDF"`; stderr = devnull))
 const HAS_H5DUMP = Sys.which("h5dump") !== nothing
+const VTK_VERSION = HAS_VTK ?
+    VersionNumber(strip(read(`$PY -c "from vtkmodules.vtkCommonCore import vtkVersion; print(vtkVersion.GetVTKVersion())"`, String))) :
+    v"0"
+# RectilinearGrid and StructuredGrid (spec 2.7) are read by VTK >= 9.7
+const HAS_VTK_97 = HAS_VTK && VTK_VERSION >= v"9.7"
 const VALIDATE = joinpath(@__DIR__, "vtk_validate.py")
 
 # On CI, at least one job must run the authoritative VTK/h5dump validation;

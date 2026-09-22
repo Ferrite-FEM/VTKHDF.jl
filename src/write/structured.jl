@@ -1,6 +1,9 @@
 # StructuredGrid writer (spec 2.7): like ImageData but with explicit point
 # positions in a Points dataset of HDF shape (nz, ny, nx, 3) — a Julia
-# (3, nx, ny, nz) array — with a prepended time dimension for temporal files.
+# (3, nx, ny, nz) array, degenerate directions included — with a prepended
+# time dimension for temporal files. The grid size is the `Dimensions`
+# attribute (VTK reads nothing else); `WholeExtent` is written as well for
+# the `whole_extent` option and this package's reader.
 
 mutable struct StructuredState <: StructuredKind
     pdims::NTuple{3, Int}
@@ -30,6 +33,7 @@ function init_structured(
     file, root = open_dest(dest)
     write_ascii_attribute(root, "Type", "StructuredGrid")
     write_version_attribute(root, (2, 7))
+    HDF5.attrs(root)["Dimensions"] = Int64[dims...]
     HDF5.attrs(root)["WholeExtent"] = Int64[ext...]
     vtk = make_vtkfile(
         file, root, StructuredState(dims, 0, nothing);
